@@ -1,103 +1,123 @@
 /**
- * LingXi — Cloudflare Worker Proxy for DeepSeek API
- *
- * 部署步骤见下方 README，或参考项目说明文档。
- * API Key 存储在 Cloudflare 环境变量 DEEPSEEK_API_KEY 中（更安全），
- * 同时保留一个硬编码备用值（仅供首次测试）。
+ * LingXi — Cloudflare Worker
+ * 代理三个后端 API，隐藏所有 Key：
+ *   POST /chat   → DeepSeek chat completions (流式)
+ *   POST /tts    → Coze TTS audio/speech (返回 MP3)
+ *   POST /image  → SiliconFlow image generations
  */
 
-// ── 允许访问的来源 ──────────────────────────────────────────
-// 把 YOUR_GITHUB_USERNAME 替换成你的 GitHub 用户名
 const ALLOWED_ORIGINS = [
-    'https://YOUR_GITHUB_USERNAME.github.io',   // ← 改成你的 GitHub Pages 地址
+    'https://chloeyouyou.github.io',
     'http://localhost',
     'http://localhost:5500',
     'http://127.0.0.1',
     'http://127.0.0.1:5500',
-    'null',   // 本地 file:// 直接打开时的 Origin
+    'null',
 ];
 
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
-
-// ── CORS 响应头 ──────────────────────────────────────────────
-function corsHeaders(origin) {
-    const allowed = ALLOWED_ORIGINS.includes(origin);
+function cors(origin) {
+    const ok = ALLOWED_ORIGINS.includes(origin);
     return {
-        'Access-Control-Allow-Origin':  allowed ? origin : 'null',
+        'Access-Control-Allow-Origin':  ok ? origin : 'null',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Max-Age':       '86400',
     };
 }
 
-// ── 主处理逻辑 ───────────────────────────────────────────────
 export default {
     async fetch(request, env) {
         const origin = request.headers.get('Origin') ?? 'null';
+        const url    = new URL(request.url);
 
-        // CORS 预检
+        // CORS preflight
         if (request.method === 'OPTIONS') {
-            return new Response(null, {
-                status: 204,
-                headers: corsHeaders(origin),
-            });
+            return new Response(null, { status: 204, headers: cors(origin) });
         }
 
-        // 只接受 POST
         if (request.method !== 'POST') {
             return new Response('Method Not Allowed', { status: 405 });
         }
 
-        // 来源校验
         if (!ALLOWED_ORIGINS.includes(origin)) {
-            return new Response('Forbidden', {
-                status: 403,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Origin not allowed: ' + origin }),
+            return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
+                status: 403, headers: { ...cors(origin), 'Content-Type': 'application/json' },
             });
         }
 
-        // 读取请求体
-        let body;
-        try {
-            body = await request.json();
-        } catch {
-            return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-                status: 400,
-                headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
-            });
+        // ── Route: /chat  (DeepSeek) ─────────────────────────────
+        if (url.pathname === '/chat' || url.pathname === '/') {
+            let body;
+            try { body = await request.json(); }
+            catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
+
+            const key = env.DEEPSEEK_API_KEY;
+            let up;
+            try {
+                up = await fetch('https://api.deepseek.com/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                    body: JSON.stringify(body),
+                });
+            } catch (e) { return jsonErr(cors(origin), 502, 'DeepSeek fetch failed: ' + e.message); }
+
+            const h = new Headers(cors(origin));
+            const ct = up.headers.get('Content-Type');
+            if (ct) h.set('Content-Type', ct);
+            return new Response(up.body, { status: up.status, headers: h });
         }
 
-        // API Key：优先读 Cloudflare 环境变量（更安全），否则用硬编码备用值
-        const apiKey = env.DEEPSEEK_API_KEY;
+        // ── Route: /tts  (Coze TTS) ──────────────────────────────
+        if (url.pathname === '/tts') {
+            let body;
+            try { body = await request.json(); }
+            catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
 
-        // 转发请求到 DeepSeek
-        let upstream;
-        try {
-            upstream = await fetch(DEEPSEEK_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type':  'application/json',
-                    'Authorization': 'Bearer ' + apiKey,
-                },
-                body: JSON.stringify(body),
-            });
-        } catch (err) {
-            return new Response(JSON.stringify({ error: 'Upstream fetch failed: ' + err.message }), {
-                status: 502,
-                headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
-            });
+            const key = env.COZE_TTS_TOKEN;
+            let up;
+            try {
+                up = await fetch('https://api.coze.cn/v1/audio/speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                    body: JSON.stringify(body),
+                });
+            } catch (e) { return jsonErr(cors(origin), 502, 'Coze TTS fetch failed: ' + e.message); }
+
+            const h = new Headers(cors(origin));
+            // Coze returns audio/mpeg
+            const ct = up.headers.get('Content-Type') || 'audio/mpeg';
+            h.set('Content-Type', ct);
+            return new Response(up.body, { status: up.status, headers: h });
         }
 
-        // 把 DeepSeek 的响应（含流式）原样返回给前端
-        const respHeaders = new Headers(corsHeaders(origin));
-        const ct = upstream.headers.get('Content-Type');
-        if (ct) respHeaders.set('Content-Type', ct);
+        // ── Route: /image  (SiliconFlow) ─────────────────────────
+        if (url.pathname === '/image') {
+            let body;
+            try { body = await request.json(); }
+            catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
 
-        return new Response(upstream.body, {
-            status:     upstream.status,
-            statusText: upstream.statusText,
-            headers:    respHeaders,
-        });
+            const key = env.SILICONFLOW_KEY;
+            let up;
+            try {
+                up = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                    body: JSON.stringify(body),
+                });
+            } catch (e) { return jsonErr(cors(origin), 502, 'SiliconFlow fetch failed: ' + e.message); }
+
+            const h = new Headers(cors(origin));
+            h.set('Content-Type', 'application/json');
+            const data = await up.text();
+            return new Response(data, { status: up.status, headers: h });
+        }
+
+        return new Response('Not Found', { status: 404 });
     },
 };
+
+function jsonErr(corsH, status, msg) {
+    return new Response(JSON.stringify({ error: msg }), {
+        status, headers: { ...corsH, 'Content-Type': 'application/json' },
+    });
+}

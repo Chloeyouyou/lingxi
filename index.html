@@ -842,30 +842,27 @@ requestAnimationFrame(dogTick);
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FEATURE 1 — IMAGE GENERATION (SiliconFlow SDXL)        ║
 // ╚══════════════════════════════════════════════════════════╝
-const SDXL_URL = 'https://api.siliconflow.cn/v1/images/generations';
-const SDXL_KEY = 'sk-yubspabaeelqkezjgeuwjhecxcinwlmgllrkqvzkxgknmumt';
-
+// Image generation — routed through Worker (/image), Key hidden in env
 async function generateSketch(rawPrompt) {
-    // Append style keywords for line-art sketch look
     const prompt = rawPrompt + ', simple line art, black and white sketch, cute cartoon, minimal strokes, white background, no shading, sticker style';
     try {
-        const resp = await fetch(SDXL_URL, {
+        const resp = await fetch(API_URL + '/image', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + SDXL_KEY,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'stabilityai/stable-diffusion-xl-base-1.0',
+                model: 'Kwai-Kolors/Kolors',
                 prompt,
-                negative_prompt: 'photo, realistic, 3d render, text, watermark, color, complex background',
+                negative_prompt: 'photo, realistic, 3d render, text, watermark, complex background',
                 image_size: '512x512',
                 num_inference_steps: 20,
                 guidance_scale: 7.5,
                 batch_size: 1,
             }),
         });
-        if (!resp.ok) return null;
+        if (!resp.ok) {
+            console.error('[Image] HTTP', resp.status, await resp.text());
+            return null;
+        }
         const data = await resp.json();
         return data?.images?.[0]?.url || data?.data?.[0]?.url || null;
     } catch (e) {
@@ -994,9 +991,8 @@ if (SpeechRecognition) {
 // ║  FEATURE 4 — VOICE OUTPUT (Coze TTS · 少年梓辛)         ║
 // ╚══════════════════════════════════════════════════════════╝
 // ← 把 COZE_TOKEN 替换成你的 Personal Access Token (pat_... 或 cztei_...)
-const COZE_TTS_TOKEN   = 'cztei_lTanP1i8B7lSV2QhWwedql1uSbAEvLSddMSaMgMbmJbxqPtWczjDlOF3WbNzdA9Vv';
-const COZE_TTS_VOICE   = '7426720361732980745';   // 少年梓辛
-const COZE_TTS_URL     = 'https://api.coze.cn/v1/audio/speech';
+// TTS — routed through Worker (/tts), Token hidden in env
+const COZE_TTS_VOICE = '7426720361732980745';   // 少年梓辛
 
 const ttsToggle = document.getElementById('ttsToggle');
 let ttsEnabled = true;
@@ -1016,7 +1012,9 @@ ttsToggle.addEventListener('click', () => {
 
 function cleanForTTS(text) {
     return text
-        .replace(/\[SKETCH:[^\]]*\]/gi, '')
+        .replace(/\[SKETCH:[^\]]*\]/gi, '')   // 图片标签
+        .replace(/（[^）]*）/g, '')             // 中文括号内容
+        .replace(/\([^)]*\)/g, '')             // 英文括号内容
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .replace(/\*(.*?)\*/g, '$1')
         .replace(/<[^>]+>/g, '')
@@ -1034,17 +1032,14 @@ async function speakText(text, btnEl) {
     if (btnEl) btnEl.classList.add('speaking');
 
     try {
-        const resp = await fetch(COZE_TTS_URL, {
+        const resp = await fetch(API_URL + '/tts', {
             method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + COZE_TTS_TOKEN,
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 input:           clean,
                 voice_id:        COZE_TTS_VOICE,
                 response_format: 'mp3',
-                speed:           0.85,    // 稍慢，温暖
+                speed:           1.0,     // 正常速度
                 sample_rate:     24000,
             }),
         });
