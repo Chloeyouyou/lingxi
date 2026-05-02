@@ -381,20 +381,20 @@
 // ║  1. BACKGROUND PHOTOS — grouped by location             ║
 // ╚══════════════════════════════════════════════════════════╝
 const LOCATIONS = [
-    { name: '关中书院',   photos: ['loc0_0.jpg','loc0_1.jpg','loc0_2.jpg','loc0_3.jpg','loc0_4.jpg','loc0_5.jpg'] },
-    { name: '兴庆宫公园', photos: ['loc1_0.jpg','loc1_1.jpg','loc1_2.jpg','loc1_3.jpg','loc1_4.jpg','loc1_5.jpg'] },
-    { name: '兵马俑',     photos: ['loc2_0.jpg','loc2_1.jpg','loc2_2.jpg','loc2_3.jpg','loc2_4.jpg','loc2_5.jpg'] },
+    { name: '关中书院',   photos: ['loc0_2.jpg','loc0_3.jpg','loc0_4.jpg','loc0_5.jpg'] },
+    { name: '兴庆宫公园', photos: ['loc1_0.jpg','loc1_1.jpg','loc1_3.jpg','loc1_4.jpg'] },
+    { name: '兵马俑',     photos: ['loc2_0.jpg','loc2_2.jpg','loc2_3.jpg','loc2_4.jpg','loc2_5.jpg'] },
     { name: '天空',       photos: ['loc3_0.jpg','loc3_1.jpg','loc3_2.jpg','loc3_3.jpg','loc3_4.jpg','loc3_5.jpg'] },
     { name: '陕历博',     photos: ['loc4_0.jpg','loc4_1.jpg','loc4_2.jpg','loc4_3.jpg','loc4_4.jpg','loc4_5.jpg'] },
     { name: '黑夜',       photos: ['loc5_0.jpg','loc5_1.jpg','loc5_2.jpg','loc5_3.jpg','loc5_4.jpg','loc5_5.jpg'] },
     { name: '灰机',       photos: ['loc6_0.jpg','loc6_1.jpg','loc6_2.jpg','loc6_3.jpg','loc6_4.jpg','loc6_5.jpg'] },
     { name: 'Harding01',  photos: ['loc7_0.jpg','loc7_1.jpg','loc7_2.jpg','loc7_3.jpg','loc7_4.jpg','loc7_5.jpg'] },
     { name: 'Harding02',  photos: ['loc8_0.jpg','loc8_1.jpg','loc8_2.jpg','loc8_3.jpg','loc8_4.jpg','loc8_5.jpg'] },
-    { name: 'Harding03',  photos: ['loc9_0.jpg','loc9_1.jpg','loc9_2.jpg','loc9_3.jpg','loc9_4.jpg','loc9_5.jpg'] },
-    { name: 'Harding04',  photos: ['loc10_0.jpg','loc10_1.jpg','loc10_2.jpg','loc10_3.jpg','loc10_4.jpg','loc10_5.jpg'] },
+    { name: 'Harding03',  photos: ['loc9_0.jpg','loc9_1.jpg','loc9_3.jpg','loc9_5.jpg'] },
+    { name: 'Harding04',  photos: ['loc10_1.jpg','loc10_3.jpg','loc10_4.jpg','loc10_5.jpg'] },
     { name: 'Harding05',  photos: ['loc11_0.jpg','loc11_1.jpg','loc11_2.jpg','loc11_3.jpg','loc11_4.jpg','loc11_5.jpg'] },
-    { name: 'Harding06',  photos: ['loc12_0.jpg','loc12_1.jpg','loc12_2.jpg','loc12_3.jpg','loc12_4.jpg','loc12_5.jpg'] },
-    { name: 'Harding07',  photos: ['loc13_0.jpg','loc13_1.jpg','loc13_2.jpg','loc13_3.jpg','loc13_4.jpg','loc13_5.jpg'] },
+    { name: 'Harding06',  photos: ['loc12_0.jpg','loc12_2.jpg','loc12_3.jpg','loc12_4.jpg','loc12_5.jpg'] },
+    { name: 'Harding07',  photos: ['loc13_0.jpg','loc13_1.jpg','loc13_2.jpg','loc13_3.jpg','loc13_5.jpg'] },
     { name: 'Harding08',  photos: ['loc14_0.jpg','loc14_1.jpg','loc14_2.jpg','loc14_3.jpg','loc14_4.jpg','loc14_5.jpg'] },
     { name: 'Harding09',  photos: ['loc15_0.jpg','loc15_1.jpg','loc15_2.jpg','loc15_3.jpg','loc15_4.jpg','loc15_5.jpg'] },
     { name: 'Harding10',  photos: ['loc16_0.jpg','loc16_1.jpg','loc16_2.jpg','loc16_3.jpg','loc16_4.jpg','loc16_5.jpg'] },
@@ -403,7 +403,7 @@ const LOCATIONS = [
     { name: 'Harding13',  photos: ['loc19_0.jpg','loc19_1.jpg','loc19_2.jpg','loc19_3.jpg','loc19_4.jpg','loc19_5.jpg'] },
     { name: 'Harding14',  photos: ['loc20_0.jpg','loc20_1.jpg','loc20_2.jpg','loc20_3.jpg','loc20_4.jpg','loc20_5.jpg'] },
     { name: 'Harding15',  photos: ['loc21_0.jpg','loc21_1.jpg','loc21_2.jpg','loc21_3.jpg','loc21_4.jpg','loc21_5.jpg'] },
-    { name: 'Harding16',  photos: ['loc22_0.jpg','loc22_1.jpg','loc22_2.jpg','loc22_3.jpg','loc22_4.jpg','loc22_5.jpg'] },
+    { name: 'Harding16',  photos: ['loc22_0.jpg','loc22_1.jpg','loc22_2.jpg','loc22_3.jpg','loc22_5.jpg'] },
 ];
 
 const bg1El   = document.getElementById('bg1');
@@ -711,19 +711,14 @@ function removeDogWhiteBg(imgEl) {
 }
 removeDogWhiteBg(dogImgEl);
 
-// --- Dog behavior constants ---
-const DOG_W       = 80;
-const PATROL_SPD  = 0.9;
-const CHASE_SPD   = 2.8;
-const WALK_HZ     = 5.5;
-const TILT_DEG    = 5;
-const BOUNCE_PX   = 4;
-const CHASE_DIST  = 220;
-const GIVEUP_DIST = 420;
-const JUMP_VEL    = -480;
-const GRAVITY     = 1900;
-const SCALE_NEAR  = 1.0;
-const SCALE_FAR   = 0.56;
+// ── DOG BEHAVIOR v2 — smooth lerp + waypoint wandering ─────────────────────
+const DOG_W      = 80;
+const SCALE_NEAR = 1.0;
+const SCALE_FAR  = 0.58;
+const CHASE_DIST = 200;    // mouse within this → chase
+const GIVEUP_DIST= 380;
+const JUMP_VEL   = -480;
+const GRAVITY    = 1900;
 
 const DOG_MSGS = [
     '今天还好吗？🌿', '我在这里陪你 ♡', '你不是一个人',
@@ -732,49 +727,115 @@ const DOG_MSGS = [
     '灵犀在，别担心', '此刻，你不孤单 🌙',
 ];
 
-let px = 0, py = 0, facing = 1;
-let dogState = 'PATROL', idleTimer = 2, walkPhase = 0;
+// ── position (px,py) are the dog's actual rendered feet coords
+let px = 0, py = 0;
+// ── smooth target the dog lerps toward
+let tx = 0, ty = 0;
+// ── current visual velocity (for tilt)
+let vx = 0, vy = 0;
+let facing   = 1;
+let walkPhase = 0;
 let jumpOffset = 0, jumpVel = 0;
 let mouseX = -9999, mouseY = -9999;
 let bubTimer = null, lastTs = null;
 
+// States: WANDER | PAUSE | SIT | TROT | CHASE | FROZEN | JUMP
+let dogState    = 'WANDER';
+let stateTimer  = 0;    // countdown in seconds
+let frozen      = false;
+
 function dogZone() {
     const W = window.innerWidth, H = window.innerHeight;
-    return { minX: 30, maxX: W - DOG_W - 30, minY: H * 0.67, maxY: H * 0.85 };
+    return { minX: 48, maxX: W - DOG_W - 48, minY: H * 0.65, maxY: H * 0.88 };
 }
 function dogScale(y) {
     const z = dogZone();
     const t = Math.max(0, Math.min(1, (y - z.minY) / (z.maxY - z.minY)));
     return SCALE_FAR + t * (SCALE_NEAR - SCALE_FAR);
 }
-function initDog() {
+
+// Pick a random waypoint in the patrol zone, biased toward current y
+function randomWaypoint() {
     const z = dogZone();
-    px = z.minX + (z.maxX - z.minX) * 0.3;
-    py = z.minY + (z.maxY - z.minY) * 0.6;
-    facing = 1;
+    const nx = z.minX + Math.random() * (z.maxX - z.minX);
+    // keep y in band, slight drift from current
+    const yRange = z.maxY - z.minY;
+    const ny = Math.max(z.minY, Math.min(z.maxY,
+        py + (Math.random() - 0.5) * yRange * 0.55
+    ));
+    return { x: nx, y: ny };
 }
 
-function renderDog(tilt, bounce, scale) {
+// Choose next wander state after reaching waypoint or timer expiry
+function nextWanderState() {
+    const r = Math.random();
+    if (r < 0.30) {
+        // PAUSE: brief stop, look around
+        dogState   = 'PAUSE';
+        stateTimer = 0.8 + Math.random() * 1.8;
+    } else if (r < 0.48) {
+        // SIT: plop down for a bit
+        dogState   = 'SIT';
+        stateTimer = 1.5 + Math.random() * 3.0;
+    } else if (r < 0.60) {
+        // TROT: pick a far waypoint and move fast
+        const wp = randomWaypoint();
+        tx = wp.x; ty = wp.y;
+        dogState   = 'TROT';
+        stateTimer = 2.5 + Math.random() * 2.0;
+    } else {
+        // WANDER: normal stroll to new waypoint
+        const wp = randomWaypoint();
+        tx = wp.x; ty = wp.y;
+        dogState   = 'WANDER';
+        stateTimer = 3.0 + Math.random() * 4.0;
+    }
+}
+
+function initDog() {
+    const z = dogZone();
+    px = z.minX + (z.maxX - z.minX) * 0.35;
+    py = z.minY + (z.maxY - z.minY) * 0.6;
+    tx = px; ty = py;
+    const wp = randomWaypoint();
+    tx = wp.x; ty = wp.y;
+}
+
+function renderDog(scale) {
     const z = dogZone();
     px = Math.max(z.minX, Math.min(z.maxX, px));
+    py = Math.max(z.minY, Math.min(z.maxY, py));
+
+    const jumping = dogState === 'JUMP';
 
     dogWrapEl.style.left = px + 'px';
     dogWrapEl.style.top  = (py + jumpOffset) + 'px';
 
+    const isMoving = (dogState === 'WANDER' || dogState === 'TROT' || dogState === 'CHASE')
+                   && Math.abs(vx) > 0.4;
+
+    // Walk tilt & bounce (body-sway, not jitter)
+    const sway = isMoving ? Math.sin(walkPhase) : 0;
+    const tilt  = isMoving ? sway * 4.5 : (dogState === 'SIT' ? 3 : 0);
+    const bounce= isMoving ? Math.abs(sway) * -3.5 : 0;
+    // Squash on jump land
+    const scaleY = jumping && jumpOffset > -10 && jumpVel > 0 ? 0.82 : 1;
+
     dogImgEl.style.transform =
         'scaleX(' + facing + ') ' +
         'scale(' + scale.toFixed(3) + ') ' +
+        'scaleY(' + scaleY + ') ' +
         'translateY(' + bounce.toFixed(1) + 'px) ' +
         'rotate(' + tilt.toFixed(1) + 'deg)';
 
-    const sW = DOG_W * scale * 0.78;
-    const sH = sW * 0.22;
+    const sW = DOG_W * scale * 0.76;
+    const sH = sW * 0.20;
     dogShadow.style.left    = (px - sW / 2) + 'px';
     dogShadow.style.top     = (py - sH * 0.5) + 'px';
     dogShadow.style.width   = sW + 'px';
     dogShadow.style.height  = sH + 'px';
-    dogShadow.style.opacity = (0.10 + scale * 0.20).toFixed(2);
-    dogShadow.style.filter  = 'blur(' + (3 + scale * 6).toFixed(1) + 'px)';
+    dogShadow.style.opacity = (0.08 + scale * 0.22).toFixed(2);
+    dogShadow.style.filter  = 'blur(' + (2 + scale * 7).toFixed(1) + 'px)';
 }
 
 function dogTick(ts) {
@@ -782,75 +843,123 @@ function dogTick(ts) {
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
 
-    const z     = dogZone();
-    const scale = dogScale(py);
-    const spd   = (dogState === 'CHASE' ? CHASE_SPD : PATROL_SPD) * scale;
-    const cx    = px;
-    const cy    = py - DOG_W * scale * 0.5;
+    const z      = dogZone();
+    const scale  = dogScale(py);
+    // Mouse distance from dog center
+    const cx     = px;
+    const cy     = py - DOG_W * scale * 0.5;
     const dMouse = Math.hypot(mouseX - cx, mouseY - cy);
 
-    if (dogState === 'PATROL') {
-        px += facing * spd;
-        py += (Math.random() - 0.5) * 0.35;
-        py = Math.max(z.minY, Math.min(z.maxY, py));
-        if (px <= z.minX) { px = z.minX; facing =  1; }
-        if (px >= z.maxX) { px = z.maxX; facing = -1; }
-        idleTimer -= dt;
-        if (idleTimer <= 0) {
-            dogState  = Math.random() < 0.22 ? 'IDLE' : 'PATROL';
-            idleTimer = dogState === 'IDLE'
-                ? 0.9 + Math.random() * 2.2
-                : 1.5 + Math.random() * 3.5;
-        }
-        if (dMouse < CHASE_DIST) dogState = 'CHASE';
-
-    } else if (dogState === 'IDLE') {
-        idleTimer -= dt;
-        if (idleTimer <= 0) { dogState = 'PATROL'; idleTimer = 1.5 + Math.random() * 3; }
-        if (dMouse < CHASE_DIST) dogState = 'CHASE';
-
-    } else if (dogState === 'CHASE') {
-        if (dMouse < 35) {
-            dogState = 'IDLE'; idleTimer = 1.2 + Math.random() * 1.8;
-        } else if (dMouse > GIVEUP_DIST) {
-            dogState = 'PATROL';
-        } else {
-            const ang = Math.atan2(mouseY - cy, mouseX - cx);
-            facing = mouseX >= cx ? 1 : -1;
-            px += Math.cos(ang) * spd;
-            py += Math.sin(ang) * spd;
-            py = Math.max(z.minY, Math.min(z.maxY, py));
-        }
-
-    } else if (dogState === 'JUMP') {
+    // ── JUMP physics (overrides everything) ──
+    if (dogState === 'JUMP') {
         jumpVel    += GRAVITY * dt;
         jumpOffset += jumpVel * dt;
         if (jumpOffset >= 0) {
             jumpOffset = 0; jumpVel = 0;
-            dogState = 'IDLE'; idleTimer = 0.8;
+            dogState = 'PAUSE'; stateTimer = 0.6;
+        }
+        const prevPx = px;
+        px += (tx - px) * 0.04;
+        vx = px - prevPx;
+        renderDog(scale);
+        requestAnimationFrame(dogTick);
+        return;
+    }
+
+    // ── FROZEN: sit still, ignore everything ──
+    if (frozen) {
+        tx = px; ty = py;  // hold position
+        renderDog(scale);
+        requestAnimationFrame(dogTick);
+        return;
+    }
+
+    // ── CHASE: mouse is close ──
+    if (!frozen && dogState === 'CHASE') {
+        if (dMouse < 30) {
+            dogState = 'PAUSE'; stateTimer = 1.0 + Math.random();
+        } else if (dMouse > GIVEUP_DIST) {
+            nextWanderState();
+        } else {
+            tx = mouseX; ty = Math.max(z.minY, Math.min(z.maxY, mouseY));
+            facing = mouseX >= cx ? 1 : -1;
         }
     }
 
-    const moving = dogState === 'PATROL' || dogState === 'CHASE';
-    if (moving) walkPhase += dt * WALK_HZ * Math.PI * 2;
-    const tilt   = moving ? Math.sin(walkPhase) * TILT_DEG : 0;
-    const bounce = moving ? Math.abs(Math.sin(walkPhase)) * -BOUNCE_PX : 0;
+    // ── WANDER / TROT / PAUSE / SIT state transitions ──
+    if (dogState !== 'CHASE') {
+        stateTimer -= dt;
 
-    renderDog(tilt, bounce, scale);
+        // Mouse entered chase zone
+        if (dMouse < CHASE_DIST && dogState !== 'SIT') {
+            dogState = 'CHASE';
+        } else if (stateTimer <= 0) {
+            nextWanderState();
+        } else if (dogState === 'WANDER' || dogState === 'TROT') {
+            // Check if close enough to target waypoint
+            const dTarget = Math.hypot(tx - px, ty - py);
+            if (dTarget < 18) nextWanderState();
+        }
+    }
+
+    // ── Lerp position toward target ──
+    const lerpBase = dogState === 'TROT' ? 0.048
+                   : dogState === 'CHASE' ? 0.072
+                   : (dogState === 'PAUSE' || dogState === 'SIT') ? 0.12
+                   : 0.032;    // WANDER: slow stroll
+
+    const prevPx = px, prevPy = py;
+    px += (tx - px) * lerpBase;
+    py += (ty - py) * lerpBase;
+    py  = Math.max(z.minY, Math.min(z.maxY, py));
+
+    vx = px - prevPx;
+    vy = py - prevPy;
+
+    // Update facing only when actually moving
+    if (Math.abs(vx) > 0.25) facing = vx > 0 ? 1 : -1;
+
+    // Walk cycle — speed tied to actual movement
+    const speed = Math.hypot(vx, vy);
+    if (speed > 0.3) walkPhase += dt * (5 + speed * 4) * Math.PI * 2;
+
+    renderDog(scale);
     requestAnimationFrame(dogTick);
 }
 
 document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
 
+// ── Single click: jump + message ──
 dogImgEl.addEventListener('click', e => {
     e.stopPropagation();
-    if (dogState === 'JUMP') return;
+    if (dogState === 'JUMP' || frozen) return;
     dogState = 'JUMP'; jumpOffset = 0; jumpVel = JUMP_VEL;
     dogBubble.textContent = DOG_MSGS[Math.floor(Math.random() * DOG_MSGS.length)];
     dogBubble.classList.add('show');
     clearTimeout(bubTimer);
     bubTimer = setTimeout(() => dogBubble.classList.remove('show'), 3200);
 });
+
+// ── Double click: toggle freeze ──
+let lastClickTime = 0;
+dogImgEl.addEventListener('click', e => {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastClickTime < 350) {
+        // Double-click detected
+        frozen = !frozen;
+        if (frozen) {
+            dogBubble.textContent = '🐾';
+            dogBubble.classList.add('show');
+            clearTimeout(bubTimer);
+        } else {
+            dogBubble.classList.remove('show');
+            nextWanderState();
+        }
+    }
+    lastClickTime = now;
+});
+
 dogImgEl.addEventListener('touchend', e => { e.preventDefault(); dogImgEl.click(); });
 
 initDog();
