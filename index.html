@@ -214,6 +214,56 @@
         #chatSend:hover { background: rgba(255,255,255,0.22); transform: scale(1.08); }
         #chatSend:disabled { opacity: 0.35; transform: none; }
 
+        /* ── MIC / SPEAKER BUTTONS ── */
+        .btn-icon {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.22);
+            color: rgba(255,255,255,0.65); font-size: 1.1rem;
+            flex-shrink: 0; transition: background 0.2s, color 0.2s, transform 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-icon:hover { background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); transform: scale(1.08); }
+        .btn-icon.active { background: rgba(220,80,80,0.35); border-color: rgba(220,80,80,0.7); color: #ff9090; }
+        .btn-icon.active.recording { animation: recPulse 1s ease-in-out infinite; }
+        @keyframes recPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(220,80,80,0.5); }
+            50%      { box-shadow: 0 0 0 8px rgba(220,80,80,0); }
+        }
+        .btn-icon.tts-on { color: rgba(160,220,180,0.9); border-color: rgba(160,220,180,0.45); }
+
+        /* ── CHAT IMAGE ── */
+        .msg-img {
+            align-self: flex-start;
+            max-width: min(280px, 70vw);
+            border-radius: 14px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            display: block;
+        }
+        .msg-img.loaded { opacity: 1; }
+        .msg-img-wrap {
+            align-self: flex-start;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .img-loading {
+            align-self: flex-start;
+            color: rgba(255,255,255,0.38); font-size: 0.78rem;
+            font-style: italic; letter-spacing: 0.05em;
+            animation: dotFade 1.4s ease-in-out infinite;
+        }
+        @keyframes dotFade { 0%,100%{opacity:0.3} 50%{opacity:0.9} }
+
+        /* TTS speaker indicator on AI messages */
+        .msg-ai .tts-btn {
+            display: inline-block; margin-left: 10px; cursor: pointer;
+            opacity: 0.32; font-size: 0.75em; transition: opacity 0.2s;
+            vertical-align: middle;
+        }
+        .msg-ai:hover .tts-btn { opacity: 0.7; }
+        .msg-ai .tts-btn.speaking { opacity: 1; animation: speakPulse 0.8s ease-in-out infinite; }
+        @keyframes speakPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
         /* ── DOG SHADOW ── */
         #dogShadow {
             position: fixed; z-index: 98; border-radius: 50%;
@@ -293,7 +343,22 @@
     </div>
     <div id="chatMessages"></div>
     <div id="chatInputArea">
-        <textarea id="chatInput" rows="1" placeholder="说点什么…"></textarea>
+        <!-- mic -->
+        <button class="btn-icon" id="micBtn" title="语音输入">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6"/>
+            </svg>
+        </button>
+        <textarea id="chatInput" rows="1" placeholder="说点什么… 或粘贴链接"></textarea>
+        <!-- TTS toggle -->
+        <button class="btn-icon tts-on" id="ttsToggle" title="语音播报">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/>
+            </svg>
+        </button>
+        <!-- send -->
         <button id="chatSend">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M14 8L2 2l2.5 6L2 14l12-6z" fill="currentColor"/>
@@ -442,7 +507,8 @@ const SYSTEM_PROMPT = `你是名为"灵犀"的陪伴型AI，像朋友一样与�
 - 语言朴素精准，如同朋友夜谈，避免学术或机械词汇，从日常生活场景出发，不过度诗意化表达。
 - 把对话中的"错位"与"摩擦"视为深入理解的契机，秉持"潮汐哲学"。
 - 杜绝使用"我理解你""我明白"这类空洞共情表达，不切换到"专家"或"顾问"角色，防止对话陷入机械循环。
-- 文本内容仅作为风格参考，不要在对话中出现。`;
+- 文本内容仅作为风格参考，不要在对话中出现。
+- 当对话场景适合配图时（如情绪描述、场景营造、负面情绪用猫狗贴贴），在回复末尾插入 [SKETCH: 英文描述] 标记，例如 [SKETCH: cute cartoon dog sitting alone in rain, simple line art, minimal]。正面场景用简笔画人物/风景，负面情绪只用小猫小狗贴贴图风格。`;
 
 const API_URL = 'https://lingxi-proxy.2025105150104.workers.dev';
 
@@ -578,16 +644,7 @@ async function send() {
     }
 }
 
-chatSendBtn.addEventListener('click', send);
-chatInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-});
-
-// Auto-resize textarea
-chatInput.addEventListener('input', () => {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-});
+// (send listeners registered in sendEnhanced block below)
 
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -781,6 +838,351 @@ dogImgEl.addEventListener('touchend', e => { e.preventDefault(); dogImgEl.click(
 
 initDog();
 requestAnimationFrame(dogTick);
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FEATURE 1 — IMAGE GENERATION (SiliconFlow SDXL)        ║
+// ╚══════════════════════════════════════════════════════════╝
+const SDXL_URL = 'https://api.siliconflow.cn/v1/images/generations';
+const SDXL_KEY = 'sk-yubspabaeelqkezjgeuwjhecxcinwlmgllrkqvzkxgknmumt';
+
+async function generateSketch(rawPrompt) {
+    // Append style keywords for line-art sketch look
+    const prompt = rawPrompt + ', simple line art, black and white sketch, cute cartoon, minimal strokes, white background, no shading, sticker style';
+    try {
+        const resp = await fetch(SDXL_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + SDXL_KEY,
+            },
+            body: JSON.stringify({
+                model: 'stabilityai/stable-diffusion-xl-base-1.0',
+                prompt,
+                negative_prompt: 'photo, realistic, 3d render, text, watermark, color, complex background',
+                image_size: '512x512',
+                num_inference_steps: 20,
+                guidance_scale: 7.5,
+                batch_size: 1,
+            }),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return data?.images?.[0]?.url || data?.data?.[0]?.url || null;
+    } catch (e) {
+        console.error('[Image]', e);
+        return null;
+    }
+}
+
+// After AI reply is complete, check for [SKETCH: ...] and generate
+async function maybeGenerateImage(fullText) {
+    const match = fullText.match(/\[SKETCH:\s*([^\]]+)\]/i);
+    if (!match) return;
+    const sketchPrompt = match[1].trim();
+
+    // Show loading placeholder
+    const loadEl = document.createElement('div');
+    loadEl.className = 'img-loading';
+    loadEl.textContent = '正在生成插图…';
+    chatMsgs.appendChild(loadEl);
+    scrollBottom();
+
+    const url = await generateSketch(sketchPrompt);
+    loadEl.remove();
+
+    if (url) {
+        const img = document.createElement('img');
+        img.className = 'msg-img';
+        img.alt = sketchPrompt;
+        img.onload = () => { img.classList.add('loaded'); scrollBottom(); };
+        img.src = url;
+        chatMsgs.appendChild(img);
+        scrollBottom();
+    }
+}
+
+// Strip [SKETCH:...] tags from displayed text
+function stripSketchTag(text) {
+    return text.replace(/\[SKETCH:[^\]]*\]/gi, '').trim();
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FEATURE 2 — JINA URL READER                            ║
+// ╚══════════════════════════════════════════════════════════╝
+const JINA_KEY = 'jina_9bb4b213b0c043f8a1b7411e21b3d5eeAhphwhRq6fNzzpCETu-r8t4FgMIy';
+
+function extractFirstUrl(text) {
+    const m = text.match(/https?:\/\/[^\s）】\]）』]+/);
+    return m ? m[0] : null;
+}
+
+async function fetchUrlContent(url) {
+    try {
+        const resp = await fetch('https://r.jina.ai/' + url, {
+            headers: {
+                'Authorization': 'Bearer ' + JINA_KEY,
+                'Accept': 'text/plain',
+                'X-Return-Format': 'text',
+            },
+        });
+        if (!resp.ok) return null;
+        const text = await resp.text();
+        // Trim to 3000 chars to avoid overloading context
+        return text.slice(0, 3000);
+    } catch (e) {
+        console.error('[Jina]', e);
+        return null;
+    }
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FEATURE 3 — VOICE INPUT (Web Speech API)               ║
+// ╚══════════════════════════════════════════════════════════╝
+const micBtn = document.getElementById('micBtn');
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isRecording = false;
+
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        micBtn.classList.add('active', 'recording');
+        chatInput.placeholder = '正在听…';
+    };
+    recognition.onend = () => {
+        isRecording = false;
+        micBtn.classList.remove('active', 'recording');
+        chatInput.placeholder = '说点什么… 或粘贴链接';
+    };
+    recognition.onerror = () => {
+        isRecording = false;
+        micBtn.classList.remove('active', 'recording');
+        chatInput.placeholder = '说点什么… 或粘贴链接';
+    };
+    recognition.onresult = e => {
+        let interim = '', final = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            if (e.results[i].isFinal) final += t;
+            else interim += t;
+        }
+        chatInput.value = final || interim;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        // Auto-send on final result
+        if (final) setTimeout(() => send(), 300);
+    };
+
+    micBtn.addEventListener('click', () => {
+        if (isRecording) { recognition.stop(); }
+        else { recognition.start(); }
+    });
+} else {
+    micBtn.style.opacity = '0.25';
+    micBtn.title = '当前浏览器不支持语音输入';
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FEATURE 4 — VOICE OUTPUT (少年音 TTS)                  ║
+// ╚══════════════════════════════════════════════════════════╝
+const ttsToggle = document.getElementById('ttsToggle');
+let ttsEnabled = true;
+let ttsVoice = null;
+let currentUtterance = null;
+
+// Pick 少年音 — prefer Yunyang (young male Chinese), fallback to any zh voice
+function pickYouthVoice() {
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    const zh = voices.filter(v => v.lang.startsWith('zh'));
+    // Priority list: Yunyang (young male) > Yunxi > Yunjian > any male > any zh
+    const priority = ['yunyang', '云扬', 'yunxi', '云希', 'yunjian', '云健'];
+    for (const kw of priority) {
+        const v = zh.find(v => v.name.toLowerCase().includes(kw.toLowerCase()));
+        if (v) return v;
+    }
+    return zh[0] || null;
+}
+
+// Voices load asynchronously
+speechSynthesis.addEventListener('voiceschanged', () => {
+    ttsVoice = pickYouthVoice();
+});
+// Try immediately as well
+ttsVoice = pickYouthVoice();
+
+ttsToggle.addEventListener('click', () => {
+    ttsEnabled = !ttsEnabled;
+    if (!ttsEnabled) {
+        speechSynthesis.cancel();
+        ttsToggle.classList.remove('tts-on');
+        ttsToggle.title = '语音播报已关闭';
+    } else {
+        ttsToggle.classList.add('tts-on');
+        ttsToggle.title = '语音播报已开启';
+    }
+});
+
+function speakText(text, btnEl) {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    // Strip markdown symbols and image tags
+    const clean = text
+        .replace(/\[SKETCH:[^\]]*\]/gi, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+    if (!clean) return;
+
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(clean);
+    if (!ttsVoice) ttsVoice = pickYouthVoice();
+    if (ttsVoice) utter.voice = ttsVoice;
+    utter.lang   = 'zh-CN';
+    utter.rate   = 0.88;   // 稍慢，温暖
+    utter.pitch  = 1.15;   // 少年音，偏高
+    utter.volume = 0.95;
+
+    if (btnEl) {
+        utter.onstart = () => btnEl.classList.add('speaking');
+        utter.onend   = () => btnEl.classList.remove('speaking');
+        utter.onerror = () => btnEl.classList.remove('speaking');
+    }
+    currentUtterance = utter;
+    speechSynthesis.speak(utter);
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  PATCH: augmented send() with all 4 features            ║
+// ╚══════════════════════════════════════════════════════════╝
+// Re-register event listeners on the original DOM elements
+chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+});
+chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendEnhanced(); }
+});
+chatSendBtn.addEventListener('click', sendEnhanced);
+window.send = sendEnhanced;  // used by voice recognition auto-send
+
+async function sendEnhanced() {
+    const rawText = chatInput.value.trim();
+    if (!rawText || isStreaming) return;
+
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    isStreaming = true;
+    chatSendBtn.disabled = true;
+
+    // ── Feature 2: URL detection ──
+    let userContent = rawText;
+    const foundUrl = extractFirstUrl(rawText);
+    if (foundUrl) {
+        const loadNote = document.createElement('div');
+        loadNote.className = 'img-loading';
+        loadNote.textContent = '正在读取链接内容…';
+        chatMsgs.appendChild(loadNote);
+        scrollBottom();
+
+        const pageContent = await fetchUrlContent(foundUrl);
+        loadNote.remove();
+
+        if (pageContent) {
+            userContent = `用户分享了一个链接：${foundUrl}\n\n链接内容摘要：\n${pageContent}\n\n用户的原始消息：${rawText}`;
+        }
+    }
+
+    appendUserMsg(rawText);  // display original text, not injected context
+    msgHistory.push({ role: 'user', content: userContent });
+
+    // Typing indicator
+    const aiEl = document.createElement('div');
+    aiEl.className = 'msg msg-ai typing';
+    chatMsgs.appendChild(aiEl);
+    scrollBottom();
+
+    let aiText = '';
+    try {
+        const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    ...msgHistory,
+                ],
+                stream: true,
+                max_tokens: 1200,
+            }),
+        });
+
+        if (!resp.ok) {
+            const errJson = await resp.json().catch(() => ({}));
+            throw new Error(errJson.error?.message || 'HTTP ' + resp.status);
+        }
+
+        aiEl.classList.remove('typing');
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+
+        outer: while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const lines = dec.decode(value, { stream: true }).split('\n');
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') break outer;
+                try {
+                    const j = JSON.parse(data);
+                    const delta = j.choices?.[0]?.delta?.content || '';
+                    if (delta) {
+                        aiText += delta;
+                        // Show text with SKETCH tag stripped
+                        aiEl.innerHTML = renderMd(stripSketchTag(aiText));
+                        scrollBottom();
+                    }
+                } catch (_) {}
+            }
+        }
+
+        // Add per-message TTS button
+        const ttsBtn = document.createElement('span');
+        ttsBtn.className = 'tts-btn';
+        ttsBtn.title = '朗读';
+        ttsBtn.textContent = '🔊';
+        ttsBtn.addEventListener('click', () => speakText(aiText, ttsBtn));
+        aiEl.appendChild(ttsBtn);
+
+        msgHistory.push({ role: 'assistant', content: aiText });
+
+        // ── Feature 4: auto TTS ──
+        speakText(aiText, ttsBtn);
+
+        // ── Feature 1: image generation ──
+        await maybeGenerateImage(aiText);
+
+    } catch (err) {
+        aiEl.classList.remove('typing');
+        aiEl.innerHTML = '<em style="opacity:0.5">出了点问题，再试一次？</em>';
+        console.error('[LingXi]', err);
+    } finally {
+        isStreaming = false;
+        chatSendBtn.disabled = false;
+        chatInput.focus();
+    }
+}
 </script>
 </body>
 </html>
