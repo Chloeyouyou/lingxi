@@ -147,6 +147,18 @@
             transition: color 0.2s;
         }
         #closeChat:hover { color: rgba(255,255,255,0.9); }
+        #clearMemory {
+            color: rgba(196,149,106,0.55); font-size: 0.72rem;
+            letter-spacing: 0.08em; padding: 4px 10px;
+            border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        #clearMemory:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        .history-divider {
+            align-self: center; color: rgba(255,255,255,0.2);
+            font-size: 0.72rem; letter-spacing: 0.12em;
+            padding: 4px 0 8px;
+        }
 
         /* Messages area */
         #chatMessages {
@@ -339,6 +351,7 @@
 <div id="chatPanel">
     <div id="chatHeader">
         <span id="chatTitle">灵 · 犀</span>
+        <button id="clearMemory" title="清空对话记忆">清空记忆</button>
         <button id="closeChat">×</button>
     </div>
     <div id="chatMessages"></div>
@@ -529,6 +542,44 @@ const SYSTEM_PROMPT = `你是名为"灵犀"的陪伴型AI，像朋友一样与�
 
 const API_URL = 'https://lingxi-proxy.2025105150104.workers.dev';
 
+// ── Persistent user identity ──
+const LINGXI_UID = (() => {
+    let id = localStorage.getItem('lingxi_uid');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('lingxi_uid', id); }
+    return id;
+})();
+
+// ── D1 memory helpers ──
+async function dbSave(role, content) {
+    try {
+        await fetch(API_URL + '/db/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID, role, content }),
+        });
+    } catch (e) { console.warn('[DB] save failed', e); }
+}
+async function dbHistory() {
+    try {
+        const r = await fetch(API_URL + '/db/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID }),
+        });
+        if (!r.ok) return [];
+        return (await r.json()).messages || [];
+    } catch (e) { console.warn('[DB] history failed', e); return []; }
+}
+async function dbClear() {
+    try {
+        await fetch(API_URL + '/db/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID }),
+        });
+    } catch (e) { console.warn('[DB] clear failed', e); }
+}
+
 const chatPanel    = document.getElementById('chatPanel');
 const chatMsgs     = document.getElementById('chatMessages');
 const chatInput    = document.getElementById('chatInput');
@@ -541,18 +592,53 @@ let msgHistory = [];  // [{role, content}]
 let isStreaming = false;
 
 // Open / close
-openChatBtn.addEventListener('click', () => {
+let historyLoaded = false;
+openChatBtn.addEventListener('click', async () => {
     heroEl.classList.add('hidden');
     chatPanel.classList.add('open');
-    // Show greeting on first open
-    if (chatMsgs.childElementCount === 0) {
-        appendAiMsg('你好。\n有什么想说的，或者不想说的，都可以。');
-    }
     chatInput.focus();
+    if (!historyLoaded) {
+        historyLoaded = true;
+        const history = await dbHistory();
+        if (history.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'history-divider';
+            divider.textContent = '─── 历史记录 ───';
+            chatMsgs.appendChild(divider);
+            for (const msg of history) {
+                if (msg.role === 'user') appendUserMsg(msg.content);
+                else {
+                    const el = appendAiMsg(msg.content);
+                    const ttsBtn = document.createElement('span');
+                    ttsBtn.className = 'tts-btn';
+                    ttsBtn.title = '朗读';
+                    ttsBtn.textContent = '🔊';
+                    ttsBtn.addEventListener('click', () => speakText(msg.content, ttsBtn));
+                    el.appendChild(ttsBtn);
+                }
+                msgHistory.push({ role: msg.role, content: msg.content });
+            }
+            const divider2 = document.createElement('div');
+            divider2.className = 'history-divider';
+            divider2.textContent = '─── 当前会话 ───';
+            chatMsgs.appendChild(divider2);
+            scrollBottom();
+        } else {
+            appendAiMsg('你好。\n有什么想说的，或者不想说的，都可以。');
+        }
+    }
 });
 closeChatBtn.addEventListener('click', () => {
     chatPanel.classList.remove('open');
     heroEl.classList.remove('hidden');
+});
+document.getElementById('clearMemory').addEventListener('click', async () => {
+    if (!confirm('清空所有对话记忆？这将删除你和灵犀的全部历史记录。')) return;
+    await dbClear();
+    chatMsgs.innerHTML = '';
+    msgHistory = [];
+    historyLoaded = false;
+    appendAiMsg('记忆已清空。\n一切重新开始。');
 });
 
 // Render simple markdown: bold, italic, newlines (sanitized)
@@ -1293,6 +1379,7 @@ async function sendEnhanced() {
 
     appendUserMsg(rawText);  // display original text, not injected context
     msgHistory.push({ role: 'user', content: userContent });
+    dbSave('user', rawText);
 
     // Typing indicator
     const aiEl = document.createElement('div');
@@ -1355,6 +1442,7 @@ async function sendEnhanced() {
         aiEl.appendChild(ttsBtn);
 
         msgHistory.push({ role: 'assistant', content: aiText });
+        dbSave('assistant', aiText);
 
         // ── Feature 4: auto TTS ──
         speakText(aiText, ttsBtn);

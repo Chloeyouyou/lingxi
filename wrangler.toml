@@ -1,0 +1,8 @@
+name = "lingxi-proxy"
+main = "worker.js"
+compatibility_date = "2024-05-18"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lingxi-db"
+database_id = "32562d9c-6910-4726-b948-b174fc3d9449"

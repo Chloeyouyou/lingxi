@@ -1,9 +1,12 @@
 /**
  * LingXi — Cloudflare Worker
- * 代理三个后端 API，隐藏所有 Key：
- *   POST /chat   → DeepSeek chat completions (流式)
- *   POST /tts    → Coze TTS audio/speech (返回 MP3)
- *   POST /image  → Stability AI SD3.5-large image generations
+ * 代理后端 API，隐藏所有 Key；D1 持久化对话记忆：
+ *   POST /chat        → DeepSeek chat completions (流式)
+ *   POST /tts         → Coze TTS audio/speech (返回 MP3)
+ *   POST /image       → Stability AI SD3.5-large image generations
+ *   POST /db/save     → 保存一条消息到 D1
+ *   POST /db/history  → 读取最近 50 条消息
+ *   POST /db/clear    → 清空该用户全部消息
  */
 
 const ALLOWED_ORIGINS = [
@@ -122,9 +125,63 @@ export default {
             return new Response(data, { status: up.status, headers: h });
         }
 
+        // ── Route: /db/*  (D1 conversation memory) ──────────────
+        if (url.pathname.startsWith('/db/')) {
+            if (!env.DB) return jsonErr(cors(origin), 503, 'D1 not bound');
+            await ensureTable(env.DB);
+
+            let body;
+            try { body = await request.json(); }
+            catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
+
+            const { user_id } = body;
+            if (!user_id) return jsonErr(cors(origin), 400, 'Missing user_id');
+
+            const h = new Headers(cors(origin));
+            h.set('Content-Type', 'application/json');
+
+            // POST /db/save
+            if (url.pathname === '/db/save') {
+                const { role, content } = body;
+                if (!role || !content) return jsonErr(cors(origin), 400, 'Missing role/content');
+                await env.DB.prepare(
+                    'INSERT INTO messages (user_id, role, content, ts) VALUES (?, ?, ?, ?)'
+                ).bind(user_id, role, content, Date.now()).run();
+                return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+            }
+
+            // POST /db/history
+            if (url.pathname === '/db/history') {
+                const result = await env.DB.prepare(
+                    'SELECT role, content, ts FROM messages WHERE user_id = ? ORDER BY ts DESC LIMIT 50'
+                ).bind(user_id).all();
+                const messages = (result.results || []).reverse();
+                return new Response(JSON.stringify({ messages }), { status: 200, headers: h });
+            }
+
+            // POST /db/clear
+            if (url.pathname === '/db/clear') {
+                await env.DB.prepare('DELETE FROM messages WHERE user_id = ?').bind(user_id).run();
+                return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+            }
+        }
+
         return new Response('Not Found', { status: 404 });
     },
 };
+
+async function ensureTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS messages (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT    NOT NULL,
+            role    TEXT    NOT NULL,
+            content TEXT    NOT NULL,
+            ts      INTEGER NOT NULL
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_user_ts ON messages(user_id, ts)`),
+    ]);
+}
 
 function jsonErr(corsH, status, msg) {
     return new Response(JSON.stringify({ error: msg }), {
