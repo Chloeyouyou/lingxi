@@ -3,7 +3,7 @@
  * 代理三个后端 API，隐藏所有 Key：
  *   POST /chat   → DeepSeek chat completions (流式)
  *   POST /tts    → Coze TTS audio/speech (返回 MP3)
- *   POST /image  → SiliconFlow image generations
+ *   POST /image  → Stability AI SD3.5-large image generations
  */
 
 const ALLOWED_ORIGINS = [
@@ -90,21 +90,31 @@ export default {
             return new Response(up.body, { status: up.status, headers: h });
         }
 
-        // ── Route: /image  (SiliconFlow) ─────────────────────────
+        // ── Route: /image  (Stability AI SD3.5-large) ────────────
         if (url.pathname === '/image') {
             let body;
             try { body = await request.json(); }
             catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
 
-            const key = env.SILICONFLOW_KEY;
+            const key = env.STABILITY_KEY;
+            // Stability AI v2beta uses multipart/form-data
+            const form = new FormData();
+            form.append('prompt', body.prompt || '');
+            form.append('model', 'sd3.5-large');
+            form.append('output_format', 'png');
+            if (body.negative_prompt) form.append('negative_prompt', body.negative_prompt);
+
             let up;
             try {
-                up = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+                up = await fetch('https://api.stability.ai/v2beta/stable-image/generate/sd3', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-                    body: JSON.stringify(body),
+                    headers: {
+                        'Authorization': 'Bearer ' + key,
+                        'Accept': 'application/json',
+                    },
+                    body: form,
                 });
-            } catch (e) { return jsonErr(cors(origin), 502, 'SiliconFlow fetch failed: ' + e.message); }
+            } catch (e) { return jsonErr(cors(origin), 502, 'Stability AI fetch failed: ' + e.message); }
 
             const h = new Headers(cors(origin));
             h.set('Content-Type', 'application/json');

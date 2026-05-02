@@ -842,21 +842,18 @@ requestAnimationFrame(dogTick);
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FEATURE 1 — IMAGE GENERATION (SiliconFlow SDXL)        ║
 // ╚══════════════════════════════════════════════════════════╝
-// Image generation — routed through Worker (/image), Key hidden in env
+// Image generation — Stability AI SD3.5-large, routed through Worker (/image)
 async function generateSketch(rawPrompt) {
-    const prompt = rawPrompt + ', simple line art, black and white sketch, cute cartoon, minimal strokes, white background, no shading, sticker style';
+    const prompt = rawPrompt
+        + ', chibi, cute, kawaii, simple sketch, white background, minimal lines'
+        + ', flat illustration, sticker style, no shading, soft outline';
     try {
         const resp = await fetch(API_URL + '/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: 'Kwai-Kolors/Kolors',
                 prompt,
-                negative_prompt: 'photo, realistic, 3d render, text, watermark, complex background',
-                image_size: '512x512',
-                num_inference_steps: 20,
-                guidance_scale: 7.5,
-                batch_size: 1,
+                negative_prompt: 'photo, realistic, 3d render, text, watermark, dark background, complex, detailed',
             }),
         });
         if (!resp.ok) {
@@ -864,6 +861,9 @@ async function generateSketch(rawPrompt) {
             return null;
         }
         const data = await resp.json();
+        // Stability AI returns base64 in data.image
+        if (data?.image) return 'data:image/png;base64,' + data.image;
+        // fallback for other formats
         return data?.images?.[0]?.url || data?.data?.[0]?.url || null;
     } catch (e) {
         console.error('[Image]', e);
