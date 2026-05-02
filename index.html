@@ -903,10 +903,11 @@ function dogTick(ts) {
     }
 
     // ── Lerp position toward target ──
-    const lerpBase = dogState === 'TROT' ? 0.048
-                   : dogState === 'CHASE' ? 0.072
-                   : (dogState === 'PAUSE' || dogState === 'SIT') ? 0.12
-                   : 0.032;    // WANDER: slow stroll
+    // Slow, natural movement — CHASE max ~2% per frame so dog jogs, not teleports
+    const lerpBase = dogState === 'TROT'  ? 0.030
+                   : dogState === 'CHASE' ? 0.022
+                   : (dogState === 'PAUSE' || dogState === 'SIT') ? 0.10
+                   : 0.018;    // WANDER: lazy stroll
 
     const prevPx = px, prevPy = py;
     px += (tx - px) * lerpBase;
@@ -1148,16 +1149,34 @@ function cleanForTTS(text) {
         .trim();
 }
 
+// Web Speech fallback (used when Coze TTS fails)
+function speakWebSpeech(clean, btnEl) {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.1;
+    const voices = speechSynthesis.getVoices();
+    const zh = voices.filter(v => v.lang.startsWith('zh'));
+    const pref = zh.find(v => /yunyang|yunxi|云扬|云希/i.test(v.name)) || zh[0];
+    if (pref) u.voice = pref;
+    if (btnEl) {
+        u.onstart = () => btnEl.classList.add('speaking');
+        u.onend   = () => btnEl.classList.remove('speaking');
+        u.onerror = () => btnEl.classList.remove('speaking');
+    }
+    speechSynthesis.speak(u);
+}
+
 async function speakText(text, btnEl) {
     if (!ttsEnabled) return;
     const clean = cleanForTTS(text);
     if (!clean) return;
 
-    // Stop any currently playing audio
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     if (btnEl) btnEl.classList.add('speaking');
 
     try {
+        console.log('[TTS] → POST', API_URL + '/tts');
         const resp = await fetch(API_URL + '/tts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1165,39 +1184,71 @@ async function speakText(text, btnEl) {
                 input:           clean,
                 voice_id:        COZE_TTS_VOICE,
                 response_format: 'mp3',
-                speed:           1.0,     // 正常速度
+                speed:           1.0,
                 sample_rate:     24000,
             }),
         });
 
+        console.log('[TTS] status:', resp.status, '| Content-Type:', resp.headers.get('Content-Type'));
+
         if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            console.error('[TTS]', err);
+            const errText = await resp.text();
+            console.error('[TTS] Error response body:', errText);
             if (btnEl) btnEl.classList.remove('speaking');
+            console.warn('[TTS] Coze failed, falling back to Web Speech API');
+            speakWebSpeech(clean, btnEl);
             return;
         }
 
-        // Response is raw MP3 binary
+        const contentType = resp.headers.get('Content-Type') || '';
+        // If Worker returned JSON (error forwarded), fall back
+        if (contentType.includes('application/json')) {
+            const errJson = await resp.json();
+            console.error('[TTS] Got JSON instead of audio:', errJson);
+            if (btnEl) btnEl.classList.remove('speaking');
+            console.warn('[TTS] Falling back to Web Speech API');
+            speakWebSpeech(clean, btnEl);
+            return;
+        }
+
         const blob = await resp.blob();
-        const url  = URL.createObjectURL(blob);
+        console.log('[TTS] Blob size:', blob.size, 'bytes | type:', blob.type);
+
+        if (blob.size < 512) {
+            // Too small to be real audio — likely an error
+            const reader = new FileReader();
+            reader.onload = () => console.error('[TTS] Tiny blob content:', reader.result);
+            reader.readAsText(blob);
+            if (btnEl) btnEl.classList.remove('speaking');
+            console.warn('[TTS] Blob too small, falling back to Web Speech API');
+            speakWebSpeech(clean, btnEl);
+            return;
+        }
+
+        const url   = URL.createObjectURL(blob);
         const audio = new Audio(url);
         currentAudio = audio;
 
+        audio.oncanplay = () => console.log('[TTS] Audio ready to play');
         audio.onended = () => {
-            URL.revokeObjectURL(url);
-            currentAudio = null;
+            URL.revokeObjectURL(url); currentAudio = null;
             if (btnEl) btnEl.classList.remove('speaking');
         };
-        audio.onerror = () => {
-            URL.revokeObjectURL(url);
-            currentAudio = null;
+        audio.onerror = (e) => {
+            console.error('[TTS] Audio playback error:', e);
+            URL.revokeObjectURL(url); currentAudio = null;
             if (btnEl) btnEl.classList.remove('speaking');
+            speakWebSpeech(clean, btnEl);
         };
-        audio.play();
+        audio.play().catch(e => {
+            console.error('[TTS] play() rejected:', e);
+            speakWebSpeech(clean, btnEl);
+        });
 
     } catch (e) {
-        console.error('[TTS]', e);
+        console.error('[TTS] Exception:', e);
         if (btnEl) btnEl.classList.remove('speaking');
+        speakWebSpeech(clean, btnEl);
     }
 }
 
