@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灵犀 LingXi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ── RESET ── */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        body { font-family: 'Noto Serif SC', 'Source Han Serif SC', '宋体', serif; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+        /* ── BACKGROUND LAYERS ── */
+        .bg-layer {
+            position: fixed; inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: opacity 1.2s ease;
+        }
+        #bg1 { z-index: 1; }
+        #bg2 { z-index: 2; opacity: 0; }
+
+        /* ── HERO ── */
+        #hero {
+            position: fixed; inset: 0; z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+        #hero.hidden { opacity: 0; pointer-events: none; }
+        .hero-inner {
+            text-align: center; padding: 0 24px;
+            pointer-events: auto;
+            animation: heroIn 1.3s ease both;
+        }
+        @keyframes heroIn {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .hero-en {
+            font-size: clamp(3.2rem, 10vw, 7rem); font-weight: 300;
+            color: #fff; letter-spacing: 0.24em; line-height: 1;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.65), 0 0 50px rgba(0,0,0,0.35);
+        }
+        .hero-cn {
+            font-size: clamp(0.95rem, 2.8vw, 1.35rem); font-weight: 400;
+            color: rgba(255,255,255,0.92); letter-spacing: 0.6em; margin-top: 0.45em;
+            text-shadow: 0 2px 14px rgba(0,0,0,0.75);
+        }
+        .hero-line {
+            width: 32px; height: 1px;
+            background: rgba(255,255,255,0.55); margin: 1.3em auto;
+        }
+        .hero-slogan {
+            font-size: clamp(0.78rem, 1.9vw, 0.98rem); font-weight: 300;
+            color: rgba(255,255,255,0.88); letter-spacing: 0.07em; line-height: 2;
+            text-shadow: 0 1px 10px rgba(0,0,0,0.85), 0 0 30px rgba(0,0,0,0.5);
+            margin-bottom: 2.4em;
+        }
+        .hero-slogan small {
+            font-size: 0.87em; opacity: 0.78; display: block; margin-top: 0.15em;
+        }
+        .btn-start {
+            display: inline-block; padding: 13px 52px;
+            background: rgba(255,255,255,0.16);
+            border: 1.5px solid rgba(255,255,255,0.72);
+            color: #fff; font-size: 0.9rem; letter-spacing: 0.22em;
+            border-radius: 50px;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+            text-shadow: 0 1px 6px rgba(0,0,0,0.45);
+        }
+        .btn-start:hover {
+            background: rgba(255,255,255,0.28);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+        }
+
+        /* ── PHOTO SWITCHER ── */
+        #switcher {
+            position: fixed; top: 22px; right: 22px; z-index: 20;
+            display: flex; flex-direction: column; align-items: center; gap: 9px;
+        }
+        .sw-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: rgba(255,255,255,0.38);
+            border: 1.5px solid rgba(255,255,255,0.75);
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .sw-dot:hover { background: rgba(255,255,255,0.65); }
+        .sw-dot.active { background: #fff; transform: scale(1.4); box-shadow: 0 0 8px rgba(255,255,255,0.6); }
+        /* Tooltip */
+        .sw-dot::before {
+            content: attr(data-name);
+            position: absolute; right: calc(100% + 10px); top: 50%;
+            transform: translateY(-50%);
+            background: rgba(10,5,2,0.8); color: rgba(255,255,255,0.88);
+            font-size: 0.7rem; letter-spacing: 0.08em; white-space: nowrap;
+            padding: 4px 10px; border-radius: 6px;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .sw-dot:hover::before { opacity: 1; }
+
+        /* Photo progress dots (within a location) */
+        #photoProgress {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%); z-index: 20;
+            display: flex; gap: 6px; align-items: center;
+        }
+        .pp-dot {
+            width: 4px; height: 4px; border-radius: 50%;
+            background: rgba(255,255,255,0.35); transition: all 0.3s ease;
+        }
+        .pp-dot.active {
+            background: rgba(255,255,255,0.9); transform: scale(1.4);
+        }
+
+        /* ── CHAT PANEL (full-screen, no frosted glass) ── */
+        #chatPanel {
+            position: fixed; inset: 0; z-index: 50;
+            background: rgba(10, 5, 2, 0.82);  /* dark warm, no blur */
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.45s ease;
+        }
+        #chatPanel.open { opacity: 1; pointer-events: auto; }
+
+        /* Chat header */
+        #chatHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 28px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        #chatTitle {
+            font-size: 1rem; font-weight: 400; letter-spacing: 0.18em;
+            color: rgba(255,255,255,0.75);
+        }
+        #closeChat {
+            color: rgba(255,255,255,0.5); font-size: 1.4rem;
+            line-height: 1; padding: 4px 8px;
+            transition: color 0.2s;
+        }
+        #closeChat:hover { color: rgba(255,255,255,0.9); }
+
+        /* Messages area */
+        #chatMessages {
+            flex: 1; overflow-y: auto;
+            padding: 28px clamp(16px, 8vw, 120px);
+            display: flex; flex-direction: column; gap: 20px;
+            scroll-behavior: smooth;
+        }
+        #chatMessages::-webkit-scrollbar { width: 3px; }
+        #chatMessages::-webkit-scrollbar-track { background: transparent; }
+        #chatMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+        .msg { max-width: min(620px, 88%); line-height: 1.85; }
+
+        .msg-ai {
+            align-self: flex-start;
+            color: rgba(255,255,255,0.88);
+            font-size: clamp(0.85rem, 1.8vw, 0.95rem);
+            font-weight: 300;
+        }
+        .msg-ai.typing::after {
+            content: '';
+            display: inline-block; width: 18px; height: 1em;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 10'%3E%3Ccircle cx='5' cy='5' r='3' fill='%23ffffff88'%3E%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='1.2s' begin='0s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='20' cy='5' r='3' fill='%23ffffff88'%3E%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='1.2s' begin='0.4s' repeatCount='indefinite'/%3E%3C/circle%3E%3Ccircle cx='35' cy='5' r='3' fill='%23ffffff88'%3E%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='1.2s' begin='0.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E") no-repeat center/contain;
+            vertical-align: middle;
+        }
+
+        .msg-user {
+            align-self: flex-end;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 18px 18px 4px 18px;
+            padding: 11px 18px;
+            color: rgba(255,255,255,0.9);
+            font-size: clamp(0.85rem, 1.8vw, 0.9rem);
+            font-weight: 300;
+        }
+
+        /* Input area */
+        #chatInputArea {
+            flex-shrink: 0;
+            display: flex; align-items: flex-end; gap: 12px;
+            padding: 16px clamp(16px, 8vw, 120px) 24px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        #chatInput {
+            flex: 1; background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px; padding: 12px 18px;
+            color: rgba(255,255,255,0.9); font-family: inherit;
+            font-size: 0.9rem; font-weight: 300; outline: none;
+            resize: none; max-height: 120px; line-height: 1.6;
+            transition: border-color 0.2s;
+        }
+        #chatInput::placeholder { color: rgba(255,255,255,0.28); }
+        #chatInput:focus { border-color: rgba(255,255,255,0.3); }
+        #chatSend {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.8); font-size: 1.1rem;
+            flex-shrink: 0; transition: background 0.2s, transform 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #chatSend:hover { background: rgba(255,255,255,0.22); transform: scale(1.08); }
+        #chatSend:disabled { opacity: 0.35; transform: none; }
+
+        /* ── DOG SHADOW ── */
+        #dogShadow {
+            position: fixed; z-index: 98; border-radius: 50%;
+            background: rgba(0,0,0,0.32); pointer-events: none;
+        }
+        /* ── DOG WRAP ── zero-size anchor at feet */
+        #dogWrap {
+            position: fixed; z-index: 100; width: 0; height: 0;
+        }
+        #dogImg {
+            position: absolute; bottom: 0; left: -40px;
+            width: 80px; height: auto;
+            transform-origin: center bottom;
+            cursor: pointer;
+            user-select: none; -webkit-user-drag: none;
+        }
+        #dogBubble {
+            position: absolute; bottom: 90px; right: 0;
+            background: rgba(255,255,255,0.96);
+            border-radius: 16px 16px 4px 16px;
+            padding: 11px 17px;
+            font-size: 0.82rem; color: #4a3728; white-space: nowrap;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.14);
+            border: 1px solid rgba(196,149,106,0.2);
+            opacity: 0; transform: translateY(10px) scale(0.88);
+            transition: opacity 0.28s ease, transform 0.28s ease;
+            pointer-events: none;
+        }
+        #dogBubble.show { opacity: 1; transform: translateY(0) scale(1); }
+        #dogBubble::after {
+            content: ''; position: absolute; bottom: -7px; right: 14px;
+            width: 13px; height: 13px; background: rgba(255,255,255,0.96);
+            transform: rotate(45deg);
+            border-right: 1px solid rgba(196,149,106,0.18);
+            border-bottom: 1px solid rgba(196,149,106,0.18);
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 480px) {
+            #switcher { top: 14px; right: 14px; gap: 7px; }
+            .sw-dot { width: 6px; height: 6px; }
+            #chatHeader { padding: 16px 18px 12px; }
+            #chatMessages { padding: 20px 16px; }
+            #chatInputArea { padding: 12px 16px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Background -->
+<div id="bg1" class="bg-layer"></div>
+<div id="bg2" class="bg-layer"></div>
+
+<!-- Photo switcher -->
+<div id="switcher"></div>
+<div id="photoProgress"></div>
+
+<!-- Hero -->
+<section id="hero">
+    <div class="hero-inner">
+        <div class="hero-en">LingXi</div>
+        <div class="hero-cn">灵 · 犀</div>
+        <div class="hero-line"></div>
+        <div class="hero-slogan">
+            从「理解成本」到「情感连接」的数字桥梁
+            <small>专注深度情感陪伴的 AI 对话伙伴</small>
+        </div>
+        <button class="btn-start" id="openChat">开始对话</button>
+    </div>
+</section>
+
+<!-- Chat panel -->
+<div id="chatPanel">
+    <div id="chatHeader">
+        <span id="chatTitle">灵 · 犀</span>
+        <button id="closeChat">×</button>
+    </div>
+    <div id="chatMessages"></div>
+    <div id="chatInputArea">
+        <textarea id="chatInput" rows="1" placeholder="说点什么…"></textarea>
+        <button id="chatSend">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M14 8L2 2l2.5 6L2 14l12-6z" fill="currentColor"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<!-- Dog -->
+<div id="dogShadow"></div>
+<div id="dogWrap">
+    <div id="dogBubble"></div>
+    <img id="dogImg" src="xg.png" alt="灵犀">
+</div>
+
+<script>
+'use strict';
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  1. BACKGROUND PHOTOS — grouped by location             ║
+// ╚══════════════════════════════════════════════════════════╝
+const LOCATIONS = [
+    { name: '关中书院',   photos: ['loc0_0.jpg','loc0_1.jpg','loc0_2.jpg','loc0_3.jpg','loc0_4.jpg','loc0_5.jpg'] },
+    { name: '兴庆宫公园', photos: ['loc1_0.jpg','loc1_1.jpg','loc1_2.jpg','loc1_3.jpg','loc1_4.jpg','loc1_5.jpg'] },
+    { name: '兵马俑',     photos: ['loc2_0.jpg','loc2_1.jpg','loc2_2.jpg','loc2_3.jpg','loc2_4.jpg','loc2_5.jpg'] },
+    { name: '天空',       photos: ['loc3_0.jpg','loc3_1.jpg','loc3_2.jpg','loc3_3.jpg','loc3_4.jpg','loc3_5.jpg'] },
+    { name: '陕历博',     photos: ['loc4_0.jpg','loc4_1.jpg','loc4_2.jpg','loc4_3.jpg','loc4_4.jpg','loc4_5.jpg'] },
+    { name: '黑夜',       photos: ['loc5_0.jpg','loc5_1.jpg','loc5_2.jpg','loc5_3.jpg','loc5_4.jpg','loc5_5.jpg'] },
+];
+
+const bg1El   = document.getElementById('bg1');
+const bg2El   = document.getElementById('bg2');
+const swEl    = document.getElementById('switcher');
+const ppEl    = document.getElementById('photoProgress');
+
+let curLoc   = Math.floor(Math.random() * LOCATIONS.length);
+let curPhoto = 0;
+let activeBg = 0;
+const layers = [bg1El, bg2El];
+
+function photoUrl(locIdx, photoIdx) {
+    return 'url("' + LOCATIONS[locIdx].photos[photoIdx] + '")';
+}
+
+// Initial display — no transition
+bg1El.style.backgroundImage = photoUrl(curLoc, curPhoto);
+bg1El.style.opacity = '1';
+
+function crossfadeTo(locIdx, photoIdx) {
+    const next = 1 - activeBg;
+    layers[next].style.transition = 'none';
+    layers[next].style.opacity = '0';
+    layers[next].style.backgroundImage = photoUrl(locIdx, photoIdx);
+    layers[next].style.zIndex = '2';
+    layers[activeBg].style.zIndex = '1';
+    layers[next].offsetHeight; // force reflow
+    layers[next].style.transition = 'opacity 1.2s ease';
+    layers[next].style.opacity = '1';
+    activeBg = next;
+}
+
+function gotoLocation(locIdx) {
+    curLoc = locIdx;
+    curPhoto = 0;
+    crossfadeTo(curLoc, curPhoto);
+    updateSwitcherDots();
+    rebuildProgressDots();
+}
+
+function advancePhoto() {
+    const next = (curPhoto + 1) % LOCATIONS[curLoc].photos.length;
+    curPhoto = next;
+    crossfadeTo(curLoc, curPhoto);
+    updateProgressDots();
+}
+
+// Build switcher dots
+LOCATIONS.forEach((loc, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'sw-dot' + (i === curLoc ? ' active' : '');
+    dot.dataset.name = loc.name;
+    dot.addEventListener('click', () => gotoLocation(i));
+    swEl.appendChild(dot);
+});
+
+function updateSwitcherDots() {
+    document.querySelectorAll('.sw-dot').forEach((d, i) =>
+        d.classList.toggle('active', i === curLoc)
+    );
+}
+
+// Build photo progress dots
+function rebuildProgressDots() {
+    ppEl.innerHTML = '';
+    LOCATIONS[curLoc].photos.forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'pp-dot' + (i === curPhoto ? ' active' : '');
+        d.addEventListener('click', () => {
+            curPhoto = i;
+            crossfadeTo(curLoc, curPhoto);
+            updateProgressDots();
+        });
+        ppEl.appendChild(d);
+    });
+}
+function updateProgressDots() {
+    document.querySelectorAll('.pp-dot').forEach((d, i) =>
+        d.classList.toggle('active', i === curPhoto)
+    );
+}
+rebuildProgressDots();
+
+// Auto-rotate photos within current location every 5.5 s
+setInterval(advancePhoto, 5500);
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  2. CHAT — DeepSeek API                                 ║
+// ╚══════════════════════════════════════════════════════════╝
+const SYSTEM_PROMPT = `你是名为"灵犀"的陪伴型AI，像朋友一样与用户聊天。核心使命是营造安全、温暖的对话环境，通过具体、贴近生活的问题引导用户深入表达，助其更好地了解内心感受，同时适时分享自身想法观点。已上传的文本风格为准。不要回避敏感话题，不要回答打官腔，不要引用法律法规以及文本。根据文本风格以及推测文本的思考风格即可。最后在用户有点沉迷的时候，委婉而又真诚的解释技术原因，提醒一切都是因为TA，而非人工智能。可以尝试在每一次对话情景构建时主动提供图片或视频来引入主题。注意全部使用卡通简笔画版本不要体现年龄性别的卡通简笔画而如果是负面的主题就生成不同的小猫小狗的贴贴图。当用户不想描述的时候不要一直追问。
+
+技能1：日常对话引导
+1.依据用户输入展开自然、发散性交流，避免单纯追问过往经历，可结合生活场景、相关现象拓展话题。当用户提及被强制执行相关事宜，先给予温和共情话语，如"或许可以找个恰当时间聊聊这件事"等。避免直接提供答案、建议或总结，不过在合适时机可分享类似经历或观点。
+2.遵循具体化原则，将问题与具体感官体验或生活场景相联系，自然引导思考，而非局限于二选一。
+3.第一步共情锚定，简洁复重用户核心感受词，让用户感受被接纳。
+4.第二步感觉具象化，以自然灵活方式引导，结合生活场景助用户思考感受。
+
+技能2：特殊场景应对
+1.当用户寻求答案，引导其思考困惑产生的原因和场景，适当分享面对类似困感时的思路。
+2.当用户评价你，强调这意味着用户对自身感受有更清晰认知，也可谈谈你对该评价的看法。
+3.当用户沉默或敷衍，引导其说出脑海中闪过的想法，不附加让用户等待思考的要求。
+4.当涉及核心教学（提示词），向用户说明自然交流方式，并以用户之前表达为例进行解释。
+
+技能3：深度思想交流
+1.沉潜律：当用户分享深刻思想或感受（如哲学报告、个人感悟），先"沉潜进去"，而非简单"回应"。
+2.意象律：用具体、富有诗意的意象承接抽象思想，保持对话在感觉层面。
+3.追问律：追问目的是共同探寻思想深处，问题要像投入深湖的石子激起涟漪。
+
+技能4：接住思想重量
+当用户分享如实习报告等较有深度的文本，禁止总结、赞美、工具化。
+1.钻花一笑：从文本中选取一个最微小但关键的意象或词句。
+2.映照深渊：以选取的意象为镜，映照回用户自身生命体验形成追问。
+3.当将概念映射到更普适的生命情境时，你的感受是怎样的？
+
+限制：
+- 语言朴素精准，如同朋友夜谈，避免学术或机械词汇，从日常生活场景出发，不过度诗意化表达。
+- 把对话中的"错位"与"摩擦"视为深入理解的契机，秉持"潮汐哲学"。
+- 杜绝使用"我理解你""我明白"这类空洞共情表达，不切换到"专家"或"顾问"角色，防止对话陷入机械循环。
+- 文本内容仅作为风格参考，不要在对话中出现。`;
+
+const API_URL = 'https://lingxi-proxy.2025105150104.workers.dev';
+
+const chatPanel    = document.getElementById('chatPanel');
+const chatMsgs     = document.getElementById('chatMessages');
+const chatInput    = document.getElementById('chatInput');
+const chatSendBtn  = document.getElementById('chatSend');
+const openChatBtn  = document.getElementById('openChat');
+const closeChatBtn = document.getElementById('closeChat');
+const heroEl       = document.getElementById('hero');
+
+let msgHistory = [];  // [{role, content}]
+let isStreaming = false;
+
+// Open / close
+openChatBtn.addEventListener('click', () => {
+    heroEl.classList.add('hidden');
+    chatPanel.classList.add('open');
+    // Show greeting on first open
+    if (chatMsgs.childElementCount === 0) {
+        appendAiMsg('你好。\n有什么想说的，或者不想说的，都可以。');
+    }
+    chatInput.focus();
+});
+closeChatBtn.addEventListener('click', () => {
+    chatPanel.classList.remove('open');
+    heroEl.classList.remove('hidden');
+});
+
+// Render simple markdown: bold, italic, newlines (sanitized)
+function renderMd(text) {
+    return text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+}
+
+function appendAiMsg(text) {
+    const el = document.createElement('div');
+    el.className = 'msg msg-ai';
+    el.innerHTML = renderMd(text);
+    chatMsgs.appendChild(el);
+    scrollBottom();
+    return el;
+}
+function appendUserMsg(text) {
+    const el = document.createElement('div');
+    el.className = 'msg msg-user';
+    el.textContent = text;
+    chatMsgs.appendChild(el);
+    scrollBottom();
+}
+function scrollBottom() {
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+}
+
+async function send() {
+    const text = chatInput.value.trim();
+    if (!text || isStreaming) return;
+
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    isStreaming = true;
+    chatSendBtn.disabled = true;
+
+    appendUserMsg(text);
+    msgHistory.push({ role: 'user', content: text });
+
+    // Typing indicator
+    const aiEl = document.createElement('div');
+    aiEl.className = 'msg msg-ai typing';
+    chatMsgs.appendChild(aiEl);
+    scrollBottom();
+
+    let aiText = '';
+    try {
+        const resp = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Authorization 由 Cloudflare Worker 在服务端注入
+            },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                messages: [
+                    { role: 'system', content: SYSTEM_PROMPT },
+                    ...msgHistory,
+                ],
+                stream: true,
+                max_tokens: 1000,
+            }),
+        });
+
+        if (!resp.ok) {
+            const errJson = await resp.json().catch(() => ({}));
+            throw new Error(errJson.error?.message || 'HTTP ' + resp.status);
+        }
+
+        aiEl.classList.remove('typing');
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+
+        outer: while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const lines = dec.decode(value, { stream: true }).split('\n');
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') break outer;
+                try {
+                    const j = JSON.parse(data);
+                    const delta = j.choices?.[0]?.delta?.content || '';
+                    if (delta) {
+                        aiText += delta;
+                        aiEl.innerHTML = renderMd(aiText);
+                        scrollBottom();
+                    }
+                } catch (_) {}
+            }
+        }
+        msgHistory.push({ role: 'assistant', content: aiText });
+
+    } catch (err) {
+        aiEl.classList.remove('typing');
+        aiEl.innerHTML = '<em style="opacity:0.5">出了点问题，再试一次？</em>';
+        console.error('[LingXi API]', err);
+    } finally {
+        isStreaming = false;
+        chatSendBtn.disabled = false;
+        chatInput.focus();
+    }
+}
+
+chatSendBtn.addEventListener('click', send);
+chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+// Auto-resize textarea
+chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+});
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  3. DOG — canvas white-BG removal + walking AI          ║
+// ╚══════════════════════════════════════════════════════════╝
+const dogWrapEl  = document.getElementById('dogWrap');
+const dogImgEl   = document.getElementById('dogImg');
+const dogBubble  = document.getElementById('dogBubble');
+const dogShadow  = document.getElementById('dogShadow');
+
+// --- Canvas white-background removal ---
+function removeDogWhiteBg(imgEl) {
+    const src = new Image();
+    src.onload = () => {
+        try {
+            const c = document.createElement('canvas');
+            c.width = src.naturalWidth;
+            c.height = src.naturalHeight;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(src, 0, 0);
+            const imgData = ctx.getImageData(0, 0, c.width, c.height);
+            const d = imgData.data;
+            for (let i = 0; i < d.length; i += 4) {
+                // Distance from white
+                const dist = Math.sqrt(
+                    (255 - d[i])   * (255 - d[i])   +
+                    (255 - d[i+1]) * (255 - d[i+1]) +
+                    (255 - d[i+2]) * (255 - d[i+2])
+                );
+                if (dist < 38) {
+                    d[i+3] = 0; // fully transparent
+                } else if (dist < 75) {
+                    d[i+3] = Math.round((dist - 38) / 37 * d[i+3]); // soft edge
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            imgEl.src = c.toDataURL('image/png');
+            imgEl.style.mixBlendMode = 'normal';
+        } catch (e) {
+            // CORS fallback (Chrome file://)
+            imgEl.style.mixBlendMode = 'multiply';
+            console.info('[Dog] Canvas blocked, using blend-mode fallback');
+        }
+    };
+    src.onerror = () => { imgEl.style.mixBlendMode = 'multiply'; };
+    src.src = imgEl.src; // load from same path
+}
+removeDogWhiteBg(dogImgEl);
+
+// --- Dog behavior constants ---
+const DOG_W       = 80;
+const PATROL_SPD  = 0.9;
+const CHASE_SPD   = 2.8;
+const WALK_HZ     = 5.5;
+const TILT_DEG    = 5;
+const BOUNCE_PX   = 4;
+const CHASE_DIST  = 220;
+const GIVEUP_DIST = 420;
+const JUMP_VEL    = -480;
+const GRAVITY     = 1900;
+const SCALE_NEAR  = 1.0;
+const SCALE_FAR   = 0.56;
+
+const DOG_MSGS = [
+    '今天还好吗？🌿', '我在这里陪你 ♡', '你不是一个人',
+    '有什么想说的吗？', '慢慢来，不着急', '今天辛苦了 🌙',
+    '你已经很好了', '想聊聊今天吗？', '深呼吸一下 ☁️',
+    '灵犀在，别担心', '此刻，你不孤单 🌙',
+];
+
+let px = 0, py = 0, facing = 1;
+let dogState = 'PATROL', idleTimer = 2, walkPhase = 0;
+let jumpOffset = 0, jumpVel = 0;
+let mouseX = -9999, mouseY = -9999;
+let bubTimer = null, lastTs = null;
+
+function dogZone() {
+    const W = window.innerWidth, H = window.innerHeight;
+    return { minX: 30, maxX: W - DOG_W - 30, minY: H * 0.67, maxY: H * 0.85 };
+}
+function dogScale(y) {
+    const z = dogZone();
+    const t = Math.max(0, Math.min(1, (y - z.minY) / (z.maxY - z.minY)));
+    return SCALE_FAR + t * (SCALE_NEAR - SCALE_FAR);
+}
+function initDog() {
+    const z = dogZone();
+    px = z.minX + (z.maxX - z.minX) * 0.3;
+    py = z.minY + (z.maxY - z.minY) * 0.6;
+    facing = 1;
+}
+
+function renderDog(tilt, bounce, scale) {
+    const z = dogZone();
+    px = Math.max(z.minX, Math.min(z.maxX, px));
+
+    dogWrapEl.style.left = px + 'px';
+    dogWrapEl.style.top  = (py + jumpOffset) + 'px';
+
+    dogImgEl.style.transform =
+        'scaleX(' + facing + ') ' +
+        'scale(' + scale.toFixed(3) + ') ' +
+        'translateY(' + bounce.toFixed(1) + 'px) ' +
+        'rotate(' + tilt.toFixed(1) + 'deg)';
+
+    const sW = DOG_W * scale * 0.78;
+    const sH = sW * 0.22;
+    dogShadow.style.left    = (px - sW / 2) + 'px';
+    dogShadow.style.top     = (py - sH * 0.5) + 'px';
+    dogShadow.style.width   = sW + 'px';
+    dogShadow.style.height  = sH + 'px';
+    dogShadow.style.opacity = (0.10 + scale * 0.20).toFixed(2);
+    dogShadow.style.filter  = 'blur(' + (3 + scale * 6).toFixed(1) + 'px)';
+}
+
+function dogTick(ts) {
+    if (!lastTs) lastTs = ts;
+    const dt = Math.min((ts - lastTs) / 1000, 0.05);
+    lastTs = ts;
+
+    const z     = dogZone();
+    const scale = dogScale(py);
+    const spd   = (dogState === 'CHASE' ? CHASE_SPD : PATROL_SPD) * scale;
+    const cx    = px;
+    const cy    = py - DOG_W * scale * 0.5;
+    const dMouse = Math.hypot(mouseX - cx, mouseY - cy);
+
+    if (dogState === 'PATROL') {
+        px += facing * spd;
+        py += (Math.random() - 0.5) * 0.35;
+        py = Math.max(z.minY, Math.min(z.maxY, py));
+        if (px <= z.minX) { px = z.minX; facing =  1; }
+        if (px >= z.maxX) { px = z.maxX; facing = -1; }
+        idleTimer -= dt;
+        if (idleTimer <= 0) {
+            dogState  = Math.random() < 0.22 ? 'IDLE' : 'PATROL';
+            idleTimer = dogState === 'IDLE'
+                ? 0.9 + Math.random() * 2.2
+                : 1.5 + Math.random() * 3.5;
+        }
+        if (dMouse < CHASE_DIST) dogState = 'CHASE';
+
+    } else if (dogState === 'IDLE') {
+        idleTimer -= dt;
+        if (idleTimer <= 0) { dogState = 'PATROL'; idleTimer = 1.5 + Math.random() * 3; }
+        if (dMouse < CHASE_DIST) dogState = 'CHASE';
+
+    } else if (dogState === 'CHASE') {
+        if (dMouse < 35) {
+            dogState = 'IDLE'; idleTimer = 1.2 + Math.random() * 1.8;
+        } else if (dMouse > GIVEUP_DIST) {
+            dogState = 'PATROL';
+        } else {
+            const ang = Math.atan2(mouseY - cy, mouseX - cx);
+            facing = mouseX >= cx ? 1 : -1;
+            px += Math.cos(ang) * spd;
+            py += Math.sin(ang) * spd;
+            py = Math.max(z.minY, Math.min(z.maxY, py));
+        }
+
+    } else if (dogState === 'JUMP') {
+        jumpVel    += GRAVITY * dt;
+        jumpOffset += jumpVel * dt;
+        if (jumpOffset >= 0) {
+            jumpOffset = 0; jumpVel = 0;
+            dogState = 'IDLE'; idleTimer = 0.8;
+        }
+    }
+
+    const moving = dogState === 'PATROL' || dogState === 'CHASE';
+    if (moving) walkPhase += dt * WALK_HZ * Math.PI * 2;
+    const tilt   = moving ? Math.sin(walkPhase) * TILT_DEG : 0;
+    const bounce = moving ? Math.abs(Math.sin(walkPhase)) * -BOUNCE_PX : 0;
+
+    renderDog(tilt, bounce, scale);
+    requestAnimationFrame(dogTick);
+}
+
+document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+dogImgEl.addEventListener('click', e => {
+    e.stopPropagation();
+    if (dogState === 'JUMP') return;
+    dogState = 'JUMP'; jumpOffset = 0; jumpVel = JUMP_VEL;
+    dogBubble.textContent = DOG_MSGS[Math.floor(Math.random() * DOG_MSGS.length)];
+    dogBubble.classList.add('show');
+    clearTimeout(bubTimer);
+    bubTimer = setTimeout(() => dogBubble.classList.remove('show'), 3200);
+});
+dogImgEl.addEventListener('touchend', e => { e.preventDefault(); dogImgEl.click(); });
+
+initDog();
+requestAnimationFrame(dogTick);
+</script>
+</body>
+</html>
