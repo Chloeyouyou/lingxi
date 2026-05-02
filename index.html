@@ -991,38 +991,21 @@ if (SpeechRecognition) {
 
 
 // ╔══════════════════════════════════════════════════════════╗
-// ║  FEATURE 4 — VOICE OUTPUT (少年音 TTS)                  ║
+// ║  FEATURE 4 — VOICE OUTPUT (Coze TTS · 少年梓辛)         ║
 // ╚══════════════════════════════════════════════════════════╝
+// ← 把 COZE_TOKEN 替换成你的 Personal Access Token (pat_... 或 cztei_...)
+const COZE_TTS_TOKEN   = 'cztei_lTanP1i8B7lSV2QhWwedql1uSbAEvLSddMSaMgMbmJbxqPtWczjDlOF3WbNzdA9Vv';
+const COZE_TTS_VOICE   = '7426720361732980745';   // 少年梓辛
+const COZE_TTS_URL     = 'https://api.coze.cn/v1/audio/speech';
+
 const ttsToggle = document.getElementById('ttsToggle');
 let ttsEnabled = true;
-let ttsVoice = null;
-let currentUtterance = null;
-
-// Pick 少年音 — prefer Yunyang (young male Chinese), fallback to any zh voice
-function pickYouthVoice() {
-    const voices = speechSynthesis.getVoices();
-    if (!voices.length) return null;
-    const zh = voices.filter(v => v.lang.startsWith('zh'));
-    // Priority list: Yunyang (young male) > Yunxi > Yunjian > any male > any zh
-    const priority = ['yunyang', '云扬', 'yunxi', '云希', 'yunjian', '云健'];
-    for (const kw of priority) {
-        const v = zh.find(v => v.name.toLowerCase().includes(kw.toLowerCase()));
-        if (v) return v;
-    }
-    return zh[0] || null;
-}
-
-// Voices load asynchronously
-speechSynthesis.addEventListener('voiceschanged', () => {
-    ttsVoice = pickYouthVoice();
-});
-// Try immediately as well
-ttsVoice = pickYouthVoice();
+let currentAudio = null;   // HTMLAudioElement currently playing
 
 ttsToggle.addEventListener('click', () => {
     ttsEnabled = !ttsEnabled;
     if (!ttsEnabled) {
-        speechSynthesis.cancel();
+        if (currentAudio) { currentAudio.pause(); currentAudio = null; }
         ttsToggle.classList.remove('tts-on');
         ttsToggle.title = '语音播报已关闭';
     } else {
@@ -1031,33 +1014,70 @@ ttsToggle.addEventListener('click', () => {
     }
 });
 
-function speakText(text, btnEl) {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    // Strip markdown symbols and image tags
-    const clean = text
+function cleanForTTS(text) {
+    return text
         .replace(/\[SKETCH:[^\]]*\]/gi, '')
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .replace(/\*(.*?)\*/g, '$1')
         .replace(/<[^>]+>/g, '')
+        .replace(/[#`>|~]/g, '')
         .trim();
+}
+
+async function speakText(text, btnEl) {
+    if (!ttsEnabled) return;
+    const clean = cleanForTTS(text);
     if (!clean) return;
 
-    speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(clean);
-    if (!ttsVoice) ttsVoice = pickYouthVoice();
-    if (ttsVoice) utter.voice = ttsVoice;
-    utter.lang   = 'zh-CN';
-    utter.rate   = 0.88;   // 稍慢，温暖
-    utter.pitch  = 1.15;   // 少年音，偏高
-    utter.volume = 0.95;
+    // Stop any currently playing audio
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    if (btnEl) btnEl.classList.add('speaking');
 
-    if (btnEl) {
-        utter.onstart = () => btnEl.classList.add('speaking');
-        utter.onend   = () => btnEl.classList.remove('speaking');
-        utter.onerror = () => btnEl.classList.remove('speaking');
+    try {
+        const resp = await fetch(COZE_TTS_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + COZE_TTS_TOKEN,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                input:           clean,
+                voice_id:        COZE_TTS_VOICE,
+                response_format: 'mp3',
+                speed:           0.85,    // 稍慢，温暖
+                sample_rate:     24000,
+            }),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            console.error('[TTS]', err);
+            if (btnEl) btnEl.classList.remove('speaking');
+            return;
+        }
+
+        // Response is raw MP3 binary
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudio = audio;
+
+        audio.onended = () => {
+            URL.revokeObjectURL(url);
+            currentAudio = null;
+            if (btnEl) btnEl.classList.remove('speaking');
+        };
+        audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            currentAudio = null;
+            if (btnEl) btnEl.classList.remove('speaking');
+        };
+        audio.play();
+
+    } catch (e) {
+        console.error('[TTS]', e);
+        if (btnEl) btnEl.classList.remove('speaking');
     }
-    currentUtterance = utter;
-    speechSynthesis.speak(utter);
 }
 
 
