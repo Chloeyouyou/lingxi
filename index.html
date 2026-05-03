@@ -661,8 +661,10 @@ const heroEl       = document.getElementById('hero');
 
 let msgHistory = [];  // [{role, content}]
 let isStreaming = false;
-let stressTotal     = 0;
-let stressTriggered = false;
+let stressTotal      = 0;
+let stressTriggered  = false;
+let inContinueMode   = false;   // 用户选"继续说说"后激活
+let lowStressStreak  = 0;       // 连续低压力回复计数
 
 // Open / close
 let historyLoaded = false;
@@ -1345,6 +1347,12 @@ function startJarGlow() {
 }
 
 // ── Stress intervention ──
+const ADVICE_LINES = [
+    '今天吃饭了吗？喝水了吗？',
+    '先去喝一口水，回来我有个小东西给你。',
+    '你现在坐着还是躺着？背后有没有靠着什么？',
+];
+
 function showStressIntervention() {
     const el = document.createElement('div');
     el.className = 'msg msg-ai stress-intervention';
@@ -1359,18 +1367,36 @@ function showStressIntervention() {
     chatMsgs.appendChild(el);
     scrollBottom();
 
+    // ── 继续说说 ──────────────────────────────────────────────
     el.querySelector('#stressContinue').addEventListener('click', () => {
         removeStressButtons(el);
-        appendAiMsg('好，我在听。');
-        askReset();
+        // 注入灵犀内心独白（role:assistant，用户不可见）
+        msgHistory.push({
+            role: 'assistant',
+            content: '（用户现在需要陪伴。我要从生活细节入手，轻轻问问今天在做什么，不给建议，不总结，就陪着。）',
+        });
+        inContinueMode  = true;
+        lowStressStreak = 0;
+        appendAiMsg('嗯，我在。');
     });
 
+    // ── 听听想法 ──────────────────────────────────────────────
     el.querySelector('#stressAdvice').addEventListener('click', () => {
         removeStressButtons(el);
-        // Set visible input so sendEnhanced() passes the empty-check
-        chatInput.value = '想听听你的想法和建议';
-        sendEnhanced();
-        askReset();
+        const line = ADVICE_LINES[Math.floor(Math.random() * ADVICE_LINES.length)];
+        const bubble = appendAiMsg(line);
+
+        // 附加"想看看吗 ✨"按钮
+        const meteorBtn = document.createElement('button');
+        meteorBtn.className = 'stress-btn';
+        meteorBtn.style.cssText = 'display:block;margin-top:12px;';
+        meteorBtn.textContent = '想看看吗 ✨';
+        meteorBtn.addEventListener('click', () => {
+            meteorBtn.remove();
+            triggerMeteorShower();
+        });
+        bubble.appendChild(meteorBtn);
+        scrollBottom();
     });
 }
 
@@ -1736,7 +1762,37 @@ async function sendEnhanced() {
             const stressMatch = aiText.match(/\[STRESS:(\d+)\]/i);
             const stressScore = stressMatch ? parseInt(stressMatch[1]) : 0;
             stressTotal = Math.min(100, stressTotal * 0.85 + stressScore * 3);
-            console.log('当前压力累积:', stressTotal);
+            console.log('当前压力累积:', stressTotal, '| streak:', lowStressStreak, '| continueMode:', inContinueMode);
+
+            // "继续说说"模式：连续3条低压力 → 灵犀主动关怀 + 流星雨按钮
+            if (inContinueMode) {
+                if (stressScore < 3) {
+                    lowStressStreak++;
+                    if (lowStressStreak >= 3) {
+                        inContinueMode  = false;
+                        lowStressStreak = 0;
+                        stressTotal     = 0;
+                        stressTriggered = false;
+                        setTimeout(() => {
+                            const bubble = appendAiMsg('好一点了吗？');
+                            const meteorBtn = document.createElement('button');
+                            meteorBtn.className = 'stress-btn';
+                            meteorBtn.style.cssText = 'display:block;margin-top:12px;';
+                            meteorBtn.textContent = '想看看吗 ✨';
+                            meteorBtn.addEventListener('click', () => {
+                                meteorBtn.remove();
+                                triggerMeteorShower();
+                            });
+                            bubble.appendChild(meteorBtn);
+                            scrollBottom();
+                        }, 600);
+                    }
+                } else {
+                    lowStressStreak = 0;   // 压力回升，重置连续计数
+                }
+            }
+
+            // 正常模式：累积达到100触发干预弹窗
             if (stressTotal >= 100 && !stressTriggered) {
                 stressTriggered = true;
                 setTimeout(() => showStressIntervention(), 800);
