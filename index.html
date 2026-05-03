@@ -1527,7 +1527,9 @@ async function sendEnhanced() {
                 if (data === '[DONE]') break outer;
                 try {
                     const j = JSON.parse(data);
-                    const delta = j.choices?.[0]?.delta?.content || '';
+                    // Guard: skip malformed chunks (streaming uses delta, not message)
+                    if (!j?.choices?.length) continue;
+                    const delta = j.choices[0]?.delta?.content || '';  // ④ optional chaining
                     if (delta) {
                         aiText += delta;
                         // Show text with system tags stripped
@@ -1538,13 +1540,22 @@ async function sendEnhanced() {
             }
         }
 
-        // ── Stress score parsing ──
-        const stressMatch = aiText.match(/\[STRESS:(\d+)\]/i);
-        const stressScore = stressMatch ? parseInt(stressMatch[1]) : 0;
-        stressTotal = Math.min(100, stressTotal * 0.85 + stressScore * 3);
-
         // Final render: strip all system tags
         aiEl.innerHTML = renderMd(stripSystemTags(aiText));
+
+        // ── Stress score parsing (isolated so failures never break the conversation) ──
+        try {
+            const stressMatch = aiText.match(/\[STRESS:(\d+)\]/i);
+            const stressScore = stressMatch ? parseInt(stressMatch[1]) : 0;
+            stressTotal = Math.min(100, stressTotal * 0.85 + stressScore * 3);
+            console.log('当前压力累积:', stressTotal);
+            if (stressTotal >= 100 && !stressTriggered) {
+                stressTriggered = true;
+                setTimeout(() => showStressIntervention(), 800);
+            }
+        } catch (e) {
+            console.warn('[Stress] parse error:', e);
+        }
 
         // Add per-message TTS button
         const ttsBtn = document.createElement('span');
@@ -1556,12 +1567,6 @@ async function sendEnhanced() {
 
         msgHistory.push({ role: 'assistant', content: aiText });
         dbSave('assistant', aiText);
-
-        // ── Stress intervention trigger ──
-        if (stressTotal >= 100 && !stressTriggered) {
-            stressTriggered = true;
-            setTimeout(() => showStressIntervention(), 800);
-        }
 
         // ── Feature 4: auto TTS ──
         speakText(aiText, ttsBtn);
