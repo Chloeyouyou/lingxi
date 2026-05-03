@@ -77,6 +77,7 @@ export default {
             catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
 
             const key = env.COZE_TTS_TOKEN;
+            if (!key) return jsonErr(cors(origin), 500, 'COZE_TTS_TOKEN secret not set in Worker');
             let up;
             try {
                 up = await fetch('https://api.coze.cn/v1/audio/speech', {
@@ -164,11 +165,57 @@ export default {
                 await env.DB.prepare('DELETE FROM messages WHERE user_id = ?').bind(user_id).run();
                 return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
             }
+
+            // ── Wish routes ──────────────────────────────────────────
+            if (url.pathname.startsWith('/db/wish/')) {
+                await ensureWishTable(env.DB);
+
+                // POST /db/wish/save
+                if (url.pathname === '/db/wish/save') {
+                    const { wish_text } = body;
+                    if (!wish_text) return jsonErr(cors(origin), 400, 'Missing wish_text');
+                    await env.DB.prepare(
+                        'INSERT INTO wishes (user_id, wish_text, lit, created_at) VALUES (?, ?, 0, ?)'
+                    ).bind(user_id, wish_text, Date.now()).run();
+                    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+                }
+
+                // POST /db/wish/list
+                if (url.pathname === '/db/wish/list') {
+                    const result = await env.DB.prepare(
+                        'SELECT id, wish_text, lit, created_at FROM wishes WHERE user_id = ? ORDER BY created_at DESC'
+                    ).bind(user_id).all();
+                    return new Response(JSON.stringify({ wishes: result.results || [] }), { status: 200, headers: h });
+                }
+
+                // POST /db/wish/toggle
+                if (url.pathname === '/db/wish/toggle') {
+                    const { wish_id } = body;
+                    if (!wish_id) return jsonErr(cors(origin), 400, 'Missing wish_id');
+                    await env.DB.prepare(
+                        'UPDATE wishes SET lit = CASE WHEN lit=0 THEN 1 ELSE 0 END WHERE id=? AND user_id=?'
+                    ).bind(wish_id, user_id).run();
+                    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+                }
+            }
         }
 
         return new Response('Not Found', { status: 404 });
     },
 };
+
+async function ensureWishTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS wishes (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    TEXT    NOT NULL,
+            wish_text  TEXT    NOT NULL,
+            lit        INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_wish_user ON wishes(user_id)`),
+    ]);
+}
 
 async function ensureTable(db) {
     await db.batch([

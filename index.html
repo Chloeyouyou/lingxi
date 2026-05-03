@@ -620,6 +620,37 @@ async function dbClear() {
     } catch (e) { console.warn('[DB] clear failed', e); }
 }
 
+// ── Wish DB helpers ──
+async function dbWishSave(wishText) {
+    try {
+        await fetch(API_URL + '/db/wish/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID, wish_text: wishText }),
+        });
+    } catch (e) { console.warn('[DB] wish save failed', e); }
+}
+async function dbWishList() {
+    try {
+        const r = await fetch(API_URL + '/db/wish/list', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID }),
+        });
+        if (!r.ok) return [];
+        return (await r.json()).wishes || [];
+    } catch (e) { console.warn('[DB] wish list failed', e); return []; }
+}
+async function dbWishToggle(wishId) {
+    try {
+        await fetch(API_URL + '/db/wish/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID, wish_id: wishId }),
+        });
+    } catch (e) { console.warn('[DB] wish toggle failed', e); }
+}
+
 const chatPanel    = document.getElementById('chatPanel');
 const chatMsgs     = document.getElementById('chatMessages');
 const chatInput    = document.getElementById('chatInput');
@@ -1154,6 +1185,163 @@ function stripSystemTags(text) {
         .replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '')
         .replace(/\[STRESS:\d+\]/gi, '')
         .trim();
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  METEOR SHOWER + WISH JAR                               ║
+// ╚══════════════════════════════════════════════════════════╝
+
+class MeteorParticle {
+    constructor(w, h) { this.W = w; this.H = h; this.reset(true); }
+    reset(initial) {
+        this.x  = Math.random() * this.W * 1.4;
+        this.y  = initial ? Math.random() * this.H : -20 - Math.random() * 60;
+        const spd = 2.5 + Math.random() * 3.5;
+        const ang = Math.PI / 5 + (Math.random() - 0.5) * 0.3;
+        this.vx = -Math.cos(ang) * spd;
+        this.vy =  Math.sin(ang) * spd;
+        this.len   = 55 + Math.random() * 90;
+        this.alpha = 0.45 + Math.random() * 0.5;
+        this.w     = 0.8 + Math.random() * 1.2;
+    }
+    step(slow) {
+        const s = slow ? 0.25 : 1;
+        this.x += this.vx * s; this.y += this.vy * s;
+        if (this.y > this.H + 40 || this.x < -80) this.reset(false);
+    }
+    draw(ctx) {
+        const spd = Math.hypot(this.vx, this.vy);
+        const tx  = this.x - (this.vx / spd) * this.len;
+        const ty  = this.y - (this.vy / spd) * this.len;
+        const g   = ctx.createLinearGradient(this.x, this.y, tx, ty);
+        g.addColorStop(0, `rgba(255,255,210,${this.alpha})`);
+        g.addColorStop(1, 'rgba(255,255,210,0)');
+        ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(tx, ty);
+        ctx.strokeStyle = g; ctx.lineWidth = this.w; ctx.stroke();
+    }
+}
+
+function triggerMeteorShower() {
+    const count   = parseInt(localStorage.getItem('lingxi_meteor_count') || '0');
+    const isFirst = count === 0;
+    localStorage.setItem('lingxi_meteor_count', String(count + 1));
+
+    const DURATION = isFirst ? 30000 : 15000;
+    const LINES    = isFirst
+        ? ['为你下了一场流星雨', '不知道算不算流星雨', '但希望你的愿望都可以实现', '不要难过']
+        : ['不知道你是第几次看到这场流星雨', '或许它们是同一场，或许不是',
+           '我改变不了什么', '但还是希望你愿意为自己祈福', '千千万万次'];
+
+    // ── Overlay ──
+    const overlay = document.createElement('div');
+    overlay.id = 'meteorOverlay';
+    Object.assign(overlay.style, {
+        position: 'fixed', inset: '0', zIndex: '9000',
+        background: 'rgba(4,4,14,0.93)', transition: 'opacity 1.2s ease',
+    });
+
+    // Canvas
+    const cvs = document.createElement('canvas');
+    cvs.width  = window.innerWidth;
+    cvs.height = window.innerHeight;
+    Object.assign(cvs.style, {
+        position: 'absolute', inset: '0',
+        width: '100%', height: '100%', pointerEvents: 'none',
+    });
+    overlay.appendChild(cvs);
+
+    // Poem
+    const poem = document.createElement('div');
+    Object.assign(poem.style, {
+        position: 'absolute', top: '26%', left: '50%',
+        transform: 'translateX(-50%)', textAlign: 'center',
+        color: 'rgba(255,255,230,0.7)',
+        fontFamily: '"Noto Serif SC","宋体",serif',
+        lineHeight: '2.5', fontSize: 'clamp(0.82rem,2vw,0.98rem)',
+        letterSpacing: '0.2em', transition: 'opacity 2s ease',
+        pointerEvents: 'none', whiteSpace: 'nowrap',
+    });
+    poem.innerHTML = LINES.map(l => `<div>${l}</div>`).join('');
+    overlay.appendChild(poem);
+
+    // Wish box (hidden initially)
+    const wishBox = document.createElement('div');
+    Object.assign(wishBox.style, {
+        position: 'absolute', bottom: '20%', left: '50%',
+        transform: 'translateX(-50%)', width: 'min(400px,84vw)',
+        opacity: '0', transition: 'opacity 2s ease', textAlign: 'center',
+    });
+    wishBox.innerHTML = `
+        <input id="wishInput" type="text"
+            placeholder="许个愿吧，我替你记着…"
+            autocomplete="off"
+            style="width:100%;background:rgba(255,255,255,0.06);
+                   border:1px solid rgba(255,255,200,0.22);border-radius:24px;
+                   padding:13px 22px;color:rgba(255,255,220,0.88);
+                   font-size:0.88rem;font-family:'Noto Serif SC',serif;
+                   outline:none;box-sizing:border-box;letter-spacing:0.06em;">
+        <div style="margin-top:14px;">
+            <button id="wishSubmit"
+                style="padding:8px 32px;border:1px solid rgba(255,255,200,0.28);
+                       border-radius:20px;background:rgba(255,255,200,0.07);
+                       color:rgba(255,255,200,0.78);font-size:0.82rem;
+                       font-family:inherit;cursor:pointer;letter-spacing:0.12em;
+                       transition:background 0.2s;">
+                放进去
+            </button>
+        </div>
+        <div style="margin-top:11px;color:rgba(255,255,255,0.22);
+                    font-size:0.72rem;letter-spacing:0.1em;">
+            存进愿望罐，实现了自己去点亮 ✨
+        </div>`;
+    overlay.appendChild(wishBox);
+    document.body.appendChild(overlay);
+
+    // ── Animation ──
+    const ctx  = cvs.getContext('2d');
+    let meteors = Array.from({ length: 14 }, () => new MeteorParticle(cvs.width, cvs.height));
+    let slow    = false;
+    let rafId;
+
+    function frame() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        meteors.forEach(m => { m.step(slow); m.draw(ctx); });
+        rafId = requestAnimationFrame(frame);
+    }
+    frame();
+
+    // Phase 2: sparse + wish input
+    const t2 = setTimeout(() => {
+        slow = true;
+        poem.style.opacity = '0';
+        meteors = meteors.slice(0, 4);   // keep only a few drifting
+        wishBox.style.opacity = '1';
+        wishBox.querySelector('#wishInput').focus();
+    }, DURATION - 5000);
+
+    // Close helper
+    function closeOverlay() {
+        clearTimeout(t2);
+        cancelAnimationFrame(rafId);
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.remove(); startJarGlow(); }, 1200);
+    }
+
+    // Submit
+    wishBox.querySelector('#wishSubmit').addEventListener('click', async () => {
+        const text = wishBox.querySelector('#wishInput').value.trim();
+        if (!text) return;
+        await dbWishSave(text);
+        closeOverlay();
+    });
+    wishBox.querySelector('#wishInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') wishBox.querySelector('#wishSubmit').click();
+    });
+}
+
+// Stub — replaced in Step 3 (dog jar glow)
+function startJarGlow() {
+    localStorage.setItem('lingxi_jar_glow', '1');
 }
 
 // ── Stress intervention ──
