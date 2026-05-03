@@ -329,6 +329,31 @@
             border-right: 1px solid rgba(196,149,106,0.18);
             border-bottom: 1px solid rgba(196,149,106,0.18);
         }
+        #dogJar {
+            position: absolute; bottom: 38px; left: 2px;
+            font-size: 1.1rem; z-index: 101;
+            pointer-events: none;
+            transition: filter 0.5s ease;
+        }
+        #dogJar.jar-glow {
+            pointer-events: auto; cursor: pointer;
+            animation: jarGlowPulse 1.8s ease-in-out infinite;
+        }
+        @keyframes jarGlowPulse {
+            0%,100% { filter: drop-shadow(0 0 3px rgba(255,215,80,0.35)); }
+            50%     { filter: drop-shadow(0 0 10px rgba(255,215,80,0.85)) drop-shadow(0 0 18px rgba(255,190,40,0.45)); }
+        }
+        #wishPanel {
+            position: fixed; z-index: 200;
+            background: rgba(12,8,6,0.96);
+            border: 1px solid rgba(196,149,106,0.28);
+            border-radius: 16px; padding: 18px 18px 14px;
+            width: 268px; max-height: 420px; overflow-y: auto;
+            box-shadow: 0 10px 36px rgba(0,0,0,0.55);
+            font-family: 'Noto Serif SC', '宋体', serif;
+        }
+        #wishPanel::-webkit-scrollbar { width: 3px; }
+        #wishPanel::-webkit-scrollbar-thumb { background: rgba(196,149,106,0.3); border-radius: 2px; }
 
         /* ── RESPONSIVE ── */
         @media (max-width: 480px) {
@@ -402,6 +427,7 @@
 <div id="dogWrap">
     <div id="dogBubble"></div>
     <img id="dogImg" src="xg.png" alt="灵犀">
+    <span id="dogJar">🫙</span>
 </div>
 
 <script>
@@ -1095,9 +1121,12 @@ function dogTick(ts) {
 
 document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
 
-// ── Single click: jump + message ──
+// ── Single click: open wish panel if glowing, else jump ──
 dogImgEl.addEventListener('click', e => {
     e.stopPropagation();
+    if (localStorage.getItem('lingxi_jar_glow') === '1' || cachedWishes?.length) {
+        openWishPanel(); return;
+    }
     if (dogState === 'JUMP' || frozen) return;
     dogState = 'JUMP'; jumpOffset = 0; jumpVel = JUMP_VEL;
     dogBubble.textContent = DOG_MSGS[Math.floor(Math.random() * DOG_MSGS.length)];
@@ -1341,9 +1370,97 @@ function triggerMeteorShower() {
     });
 }
 
-// Stub — replaced in Step 3 (dog jar glow)
+// ── Wish jar glow ──
+let cachedWishes = null;
+const dogJarEl   = document.getElementById('dogJar');
+
 function startJarGlow() {
     localStorage.setItem('lingxi_jar_glow', '1');
+    dogJarEl.classList.add('jar-glow');
+}
+
+// Restore glow on page reload if flag is set
+if (localStorage.getItem('lingxi_jar_glow') === '1') {
+    dogJarEl.classList.add('jar-glow');
+}
+
+dogJarEl.addEventListener('click', e => { e.stopPropagation(); openWishPanel(); });
+
+async function openWishPanel() {
+    localStorage.removeItem('lingxi_jar_glow');
+    dogJarEl.classList.remove('jar-glow');
+    document.getElementById('wishPanel')?.remove();
+
+    cachedWishes = await dbWishList();
+
+    if (!cachedWishes.length) {
+        dogBubble.textContent = '愿望罐还是空的～';
+        dogBubble.classList.add('show');
+        clearTimeout(bubTimer);
+        bubTimer = setTimeout(() => dogBubble.classList.remove('show'), 2500);
+        return;
+    }
+
+    const PANEL_W = 268;
+    const PANEL_H = Math.min(420, 60 + cachedWishes.length * 52);
+    const rawL    = px - PANEL_W / 2;
+    const rawT    = py - PANEL_H - 24;
+    const left    = Math.max(8, Math.min(window.innerWidth  - PANEL_W - 8, rawL));
+    const top     = Math.max(8, Math.min(window.innerHeight - PANEL_H - 8, rawT));
+
+    const panel = document.createElement('div');
+    panel.id = 'wishPanel';
+    panel.style.left = left + 'px';
+    panel.style.top  = top  + 'px';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;';
+    header.innerHTML = `
+        <span style="font-size:0.85rem;letter-spacing:0.2em;color:rgba(196,149,106,0.85);">✦ 愿望罐 ✦</span>
+        <span id="wishPanelClose" style="cursor:pointer;color:rgba(255,255,255,0.35);font-size:1.15rem;line-height:1;padding:0 2px;">×</span>
+    `;
+    panel.appendChild(header);
+
+    const list = document.createElement('div');
+    cachedWishes.forEach(wish => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;';
+
+        const star = document.createElement('span');
+        star.style.cssText = 'font-size:1rem;flex-shrink:0;margin-top:2px;transition:filter 0.4s,color 0.3s;';
+        const setStarStyle = (lit) => {
+            star.textContent = lit ? '✦' : '✧';
+            star.style.color  = lit ? 'rgba(255,210,70,0.92)' : 'rgba(255,255,255,0.22)';
+            star.style.filter = lit ? 'drop-shadow(0 0 5px rgba(255,200,50,0.8))' : 'none';
+        };
+        setStarStyle(wish.lit);
+
+        const txt = document.createElement('span');
+        txt.style.cssText = 'font-size:0.8rem;line-height:1.65;letter-spacing:0.04em;';
+        txt.style.color = wish.lit ? 'rgba(255,255,210,0.82)' : 'rgba(255,255,255,0.38)';
+        txt.textContent = wish.wish_text;
+
+        row.addEventListener('click', async () => {
+            wish.lit = wish.lit ? 0 : 1;
+            setStarStyle(wish.lit);
+            txt.style.color = wish.lit ? 'rgba(255,255,210,0.82)' : 'rgba(255,255,255,0.38)';
+            await dbWishToggle(wish.id);
+        });
+
+        row.appendChild(star); row.appendChild(txt);
+        list.appendChild(row);
+    });
+    panel.appendChild(list);
+
+    panel.querySelector('#wishPanelClose').addEventListener('click', () => panel.remove());
+    // Close on outside click
+    setTimeout(() => {
+        document.addEventListener('click', function outside(e) {
+            if (!panel.contains(e.target)) { panel.remove(); document.removeEventListener('click', outside); }
+        });
+    }, 0);
+
+    document.body.appendChild(panel);
 }
 
 // ── Stress intervention ──
