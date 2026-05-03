@@ -1069,7 +1069,7 @@ async function generateSketch(rawPrompt) {
 
 // After AI reply is complete, check for [SKETCH: ...] and generate
 async function maybeGenerateImage(fullText) {
-    const match = fullText.match(/\[SKETCH:\s*([^\]]+)\]/i);
+    const match = fullText.match(/\[S?K?ETCH\s*:\s*([^\]]+)\]/i);
     if (!match) return;
     const sketchPrompt = match[1].trim();
 
@@ -1094,7 +1094,7 @@ async function maybeGenerateImage(fullText) {
 
 // Strip [SKETCH:...] tags from displayed text
 function stripSketchTag(text) {
-    return text.replace(/\[SKETCH:[^\]]*\]/gi, '').trim();
+    return text.replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '').trim();
 }
 
 
@@ -1206,7 +1206,7 @@ ttsToggle.addEventListener('click', () => {
 
 function cleanForTTS(text) {
     return text
-        .replace(/\[SKETCH:[^\]]*\]/gi, '')   // 图片标签
+        .replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '')   // 图片标签
         .replace(/（[^）]*）/g, '')             // 中文括号内容
         .replace(/\([^)]*\)/g, '')             // 英文括号内容
         .replace(/\*\*(.*?)\*\*/g, '$1')
