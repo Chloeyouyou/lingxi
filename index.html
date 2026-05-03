@@ -1052,33 +1052,13 @@ requestAnimationFrame(dogTick);
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FEATURE 1 — IMAGE GENERATION (SiliconFlow SDXL)        ║
 // ╚══════════════════════════════════════════════════════════╝
-// Image generation — Stability AI SD3.5-large, routed through Worker (/image)
+// Image generation — Pollinations.AI (free, no key needed)
 async function generateSketch(rawPrompt) {
     const prompt = rawPrompt
         + ', chibi, cute, kawaii, simple sketch, white background, minimal lines'
         + ', flat illustration, sticker style, no shading, soft outline';
-    try {
-        const resp = await fetch(API_URL + '/image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt,
-                negative_prompt: 'photo, realistic, 3d render, text, watermark, dark background, complex, detailed',
-            }),
-        });
-        if (!resp.ok) {
-            console.error('[Image] HTTP', resp.status, await resp.text());
-            return null;
-        }
-        const data = await resp.json();
-        // Stability AI returns base64 in data.image
-        if (data?.image) return 'data:image/png;base64,' + data.image;
-        // fallback for other formats
-        return data?.images?.[0]?.url || data?.data?.[0]?.url || null;
-    } catch (e) {
-        console.error('[Image]', e);
-        return null;
-    }
+    const encoded = encodeURIComponent(prompt);
+    return `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&model=flux-anime&seed=${Date.now()}`;
 }
 
 // After AI reply is complete, check for [SKETCH: ...] and generate
@@ -1095,17 +1075,15 @@ async function maybeGenerateImage(fullText) {
     scrollBottom();
 
     const url = await generateSketch(sketchPrompt);
-    loadEl.remove();
+    if (!url) { loadEl.remove(); return; }
 
-    if (url) {
-        const img = document.createElement('img');
-        img.className = 'msg-img';
-        img.alt = sketchPrompt;
-        img.onload = () => { img.classList.add('loaded'); scrollBottom(); };
-        img.src = url;
-        chatMsgs.appendChild(img);
-        scrollBottom();
-    }
+    const img = document.createElement('img');
+    img.className = 'msg-img';
+    img.alt = sketchPrompt;
+    img.onload  = () => { loadEl.remove(); img.classList.add('loaded'); scrollBottom(); };
+    img.onerror = () => { loadEl.remove(); console.error('[Image] Pollinations load failed'); };
+    img.src = url;
+    chatMsgs.insertBefore(img, loadEl);
 }
 
 // Strip [SKETCH:...] tags from displayed text
