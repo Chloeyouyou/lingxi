@@ -436,6 +436,28 @@ const LOCATIONS = [
     { name: 'Harding16',  photos: ['images/l22_0.jpg','images/l22_1.jpg','images/l22_2.jpg','images/l22_3.jpg','images/l22_4.jpg'] },
 ];
 
+// ── Mood → location pool mapping ──
+const MOOD_MAP = {
+    'warm and healing':    [7, 8, 9, 10, 11, 17, 18],
+    'light and cheerful':  [1, 2, 4, 5, 12, 13, 14],
+    'quiet companionship': [5, 6, 3, 15, 16],
+    'melancholy':          [6, 5, 3],
+    'journey':             [0, 6, 7],
+    'history':             [2, 4],
+    'default':             [3, 7, 8, 9, 10],
+};
+
+function moodToLocationIdx(mood) {
+    const m = (mood || '').toLowerCase();
+    if (m.includes('warm')   || m.includes('healing'))      return MOOD_MAP['warm and healing'];
+    if (m.includes('light')  || m.includes('cheerful'))     return MOOD_MAP['light and cheerful'];
+    if (m.includes('quiet')  || m.includes('companion'))    return MOOD_MAP['quiet companionship'];
+    if (m.includes('melanch')|| m.includes('sad'))          return MOOD_MAP['melancholy'];
+    if (m.includes('journey')|| m.includes('travel'))       return MOOD_MAP['journey'];
+    if (m.includes('histor') || m.includes('ancient'))      return MOOD_MAP['history'];
+    return MOOD_MAP['default'];
+}
+
 const bg1El   = document.getElementById('bg1');
 const bg2El   = document.getElementById('bg2');
 const swEl    = document.getElementById('switcher');
@@ -1072,45 +1094,56 @@ requestAnimationFrame(dogTick);
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FEATURE 1 — IMAGE GENERATION (SiliconFlow SDXL)        ║
 // ╚══════════════════════════════════════════════════════════╝
-// Image generation — Pollinations.AI (free, no key needed)
+// ── Image: local photo library matched by mood ──
+
+// Resolve a [SKETCH:...] tag to a local photo path based on mood
+function resolveSketch(sketchTag) {
+    const match = sketchTag.match(/\[S?K?ETCH\s*[:\s]+(.*?)\|\s*(.*?)\]/i)
+                || sketchTag.match(/\[S?K?ETCH\s*[:\s]+(.*?)\]/i);
+    const mood = match ? (match[2] || match[1] || '') : '';
+
+    const locPool = moodToLocationIdx(mood);
+    const locIdx  = locPool[Math.floor(Math.random() * locPool.length)];
+    const loc     = LOCATIONS[locIdx];
+    const photoIdx = Math.floor(Math.random() * loc.photos.length);
+    return loc.photos[photoIdx];
+}
+
+// After AI reply is complete, maybe attach a photo to aiEl
+function maybeGenerateImage(fullText, aiEl) {
+    // Low-frequency: show at most 1 image every 3 AI replies
+    if (!window._sketchCounter) window._sketchCounter = 0;
+    window._sketchCounter++;
+    if (window._sketchCounter % 3 !== 0) return;
+
+    const tagMatch = fullText.match(/\[S?K?ETCH\s*:[^\]]+\]/i);
+    if (!tagMatch) return;
+
+    const imgUrl = resolveSketch(tagMatch[0]);
+    const imgEl  = document.createElement('img');
+    imgEl.style.cssText = [
+        'width:100%', 'max-width:420px', 'border-radius:12px',
+        'margin-top:12px', 'opacity:0', 'transition:opacity 0.8s ease',
+        'display:block',
+    ].join(';');
+    imgEl.onload  = () => { imgEl.style.opacity = '1'; scrollBottom(); };
+    imgEl.onerror = () => {};   // silent fail
+    imgEl.src = imgUrl;
+    aiEl.appendChild(imgEl);
+}
+
+/* Pollinations fallback — kept for easy re-enable
 async function generateSketch(rawPrompt) {
-    // Parse "subject | mood" format from AI
-    const parts = rawPrompt.split('|');
+    const parts   = rawPrompt.split('|');
     const subject = parts[0].trim();
     const mood    = (parts[1] || 'warm and healing').trim();
-
-    const prompt = `kawaii cartoon illustration, Q-version ${subject}, `
+    const prompt  = `kawaii cartoon illustration, Q-version ${subject}, `
         + `thick clean outline, soft pastel colors, gentle shading, big cute eyes, `
-        + `white background, sticker style, no text, `
-        + `convey the mood of ${mood}`;
+        + `white background, sticker style, no text, convey the mood of ${mood}`;
     const encoded = encodeURIComponent(prompt);
     return `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&model=flux-anime&seed=${Date.now()}`;
 }
-
-// After AI reply is complete, check for [SKETCH: ...] and generate
-async function maybeGenerateImage(fullText) {
-    const match = fullText.match(/\[S?K?ETCH\s*:\s*([^\]]+)\]/i);
-    if (!match) return;
-    const sketchPrompt = match[1].trim();
-
-    // Show loading placeholder
-    const loadEl = document.createElement('div');
-    loadEl.className = 'img-loading';
-    loadEl.textContent = '正在生成插图…';
-    chatMsgs.appendChild(loadEl);
-    scrollBottom();
-
-    const url = await generateSketch(sketchPrompt);
-    if (!url) { loadEl.remove(); return; }
-
-    const img = document.createElement('img');
-    img.className = 'msg-img';
-    img.alt = sketchPrompt;
-    img.onload  = () => { loadEl.remove(); img.classList.add('loaded'); scrollBottom(); };
-    img.onerror = () => { loadEl.remove(); console.error('[Image] Pollinations load failed'); };
-    img.src = url;
-    chatMsgs.insertBefore(img, loadEl);
-}
+*/
 
 // Strip all system-only tags from displayed text
 function stripSketchTag(text) {
@@ -1533,7 +1566,7 @@ async function sendEnhanced() {
         speakText(aiText, ttsBtn);
 
         // ── Feature 1: image generation ──
-        await maybeGenerateImage(aiText);
+        maybeGenerateImage(aiText, aiEl);
 
     } catch (err) {
         aiEl.classList.remove('typing');
