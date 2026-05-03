@@ -653,7 +653,7 @@ function renderMd(text) {
 function appendAiMsg(text) {
     const el = document.createElement('div');
     el.className = 'msg msg-ai';
-    el.innerHTML = renderMd(text);
+    el.innerHTML = renderMd(stripSketchTag(text));
     chatMsgs.appendChild(el);
     scrollBottom();
     return el;
