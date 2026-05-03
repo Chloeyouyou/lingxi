@@ -1171,15 +1171,16 @@ function showStressIntervention() {
     chatMsgs.appendChild(el);
     scrollBottom();
 
-    document.getElementById('stressContinue').addEventListener('click', () => {
+    el.querySelector('#stressContinue').addEventListener('click', () => {
         removeStressButtons(el);
         appendAiMsg('好，我在听。');
         askReset();
     });
 
-    document.getElementById('stressAdvice').addEventListener('click', () => {
+    el.querySelector('#stressAdvice').addEventListener('click', () => {
         removeStressButtons(el);
-        msgHistory.push({ role: 'user', content: '[用户希望听到灵犀的想法和建议]' });
+        // Set visible input so sendEnhanced() passes the empty-check
+        chatInput.value = '想听听你的想法和建议';
         sendEnhanced();
         askReset();
     });
@@ -1203,13 +1204,13 @@ function askReset() {
         chatMsgs.appendChild(el);
         scrollBottom();
 
-        document.getElementById('resetYes').addEventListener('click', () => {
+        el.querySelector('#resetYes').addEventListener('click', () => {
             stressTotal = 0;
             stressTriggered = false;
             el.innerHTML = '<span style="opacity:0.35; font-size:0.8em;">已重置 ✓</span>';
         });
 
-        document.getElementById('resetNo').addEventListener('click', () => {
+        el.querySelector('#resetNo').addEventListener('click', () => {
             stressTriggered = false;
             el.innerHTML = '<span style="opacity:0.35; font-size:0.8em;">已保留 ✓</span>';
         });
