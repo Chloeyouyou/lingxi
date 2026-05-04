@@ -4,9 +4,13 @@
  *   POST /chat        → DeepSeek chat completions (流式)
  *   POST /tts         → Coze TTS audio/speech (返回 MP3)
  *   POST /image       → Stability AI SD3.5-large image generations
+ *   POST /jina        → Jina AI URL reader (隐藏 JINA_KEY)
  *   POST /db/save     → 保存一条消息到 D1
  *   POST /db/history  → 读取最近 50 条消息
  *   POST /db/clear    → 清空该用户全部消息
+ *
+ * Env secrets (set via wrangler secret put):
+ *   DEEPSEEK_API_KEY, COZE_TTS_TOKEN, STABILITY_KEY, JINA_KEY
  */
 
 const ALLOWED_ORIGINS = [
@@ -31,12 +35,27 @@ function cors(origin) {
 export default {
     async fetch(request, env) {
         const origin = request.headers.get('Origin') ?? 'null';
-        const url    = new URL(request.url);
 
-        // CORS preflight
+        // CORS preflight — handled before any routing so it always succeeds
         if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: cors(origin) });
         }
+
+        // Wrap everything in a top-level try-catch so uncaught exceptions
+        // still return CORS headers (otherwise browser sees a CORS error)
+        try {
+            return await handleRequest(request, env, origin);
+        } catch (e) {
+            return new Response(JSON.stringify({ error: 'Internal error: ' + e.message }), {
+                status: 500,
+                headers: { ...cors(origin), 'Content-Type': 'application/json' },
+            });
+        }
+    },
+};
+
+async function handleRequest(request, env, origin) {
+        const url    = new URL(request.url);
 
         if (request.method !== 'POST') {
             return new Response('Method Not Allowed', { status: 405 });
@@ -92,6 +111,31 @@ export default {
             const ct = up.headers.get('Content-Type') || 'audio/mpeg';
             h.set('Content-Type', ct);
             return new Response(up.body, { status: up.status, headers: h });
+        }
+
+        // ── Route: /jina  (Jina AI URL reader) ──────────────────
+        if (url.pathname === '/jina') {
+            let body;
+            try { body = await request.json(); }
+            catch { return jsonErr(cors(origin), 400, 'Invalid JSON'); }
+            const { url: targetUrl } = body;
+            if (!targetUrl) return jsonErr(cors(origin), 400, 'Missing url');
+            const key = env.JINA_KEY;
+            if (!key) return jsonErr(cors(origin), 500, 'JINA_KEY secret not set');
+            let up;
+            try {
+                up = await fetch('https://r.jina.ai/' + targetUrl, {
+                    headers: {
+                        'Authorization': 'Bearer ' + key,
+                        'Accept': 'text/plain',
+                        'X-Return-Format': 'text',
+                    },
+                });
+            } catch (e) { return jsonErr(cors(origin), 502, 'Jina fetch failed: ' + e.message); }
+            const h = new Headers(cors(origin));
+            h.set('Content-Type', 'text/plain; charset=utf-8');
+            const text = await up.text();
+            return new Response(text.slice(0, 3000), { status: up.status, headers: h });
         }
 
         // ── Route: /image  (Stability AI SD3.5-large) ────────────
@@ -201,8 +245,7 @@ export default {
         }
 
         return new Response('Not Found', { status: 404 });
-    },
-};
+}
 
 async function ensureWishTable(db) {
     await db.batch([
