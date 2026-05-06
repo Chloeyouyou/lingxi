@@ -164,13 +164,13 @@
             border-left: 2px solid rgba(196,149,106,0.4);
             padding-left: 14px;
         }
-        #clearMemory {
+        #clearMemory, #newSession {
             color: rgba(196,149,106,0.55); font-size: 0.72rem;
             letter-spacing: 0.08em; padding: 4px 10px;
             border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
             transition: color 0.2s, border-color 0.2s;
         }
-        #clearMemory:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #clearMemory:hover, #newSession:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         .history-divider {
             align-self: center; color: rgba(255,255,255,0.2);
             font-size: 0.72rem; letter-spacing: 0.12em;
@@ -393,7 +393,10 @@
 <div id="chatPanel">
     <div id="chatHeader">
         <span id="chatTitle">灵 · 犀</span>
-        <button id="clearMemory" title="清空对话记忆">清空记忆</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
+            <button id="clearMemory" title="清空对话记忆">清空记忆</button>
+        </div>
         <button id="closeChat">×</button>
     </div>
     <div id="chatMessages"></div>
@@ -670,12 +673,13 @@ async function dbWishList() {
 }
 async function dbWishToggle(wishId) {
     try {
-        await fetch(API_URL + '/db/wish/toggle', {
+        const r = await fetch(API_URL + '/db/wish/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: LINGXI_UID, wish_id: wishId }),
         });
-    } catch (e) { console.warn('[DB] wish toggle failed', e); }
+        return r.ok;
+    } catch (e) { console.warn('[DB] wish toggle failed', e); return false; }
 }
 
 const chatPanel    = document.getElementById('chatPanel');
@@ -734,6 +738,13 @@ closeChatBtn.addEventListener('click', () => {
     chatPanel.classList.remove('open');
     heroEl.classList.remove('hidden');
 });
+document.getElementById('newSession').addEventListener('click', () => {
+    chatMsgs.innerHTML = '';
+    msgHistory = [];
+    historyLoaded = true;   // 不再从 D1 重载历史，本次从空白开始
+    appendAiMsg('嗯，我在。\n之前的一切都还在，只是先放一放。');
+});
+
 document.getElementById('clearMemory').addEventListener('click', async () => {
     if (!confirm('清空所有对话记忆？这将删除你和灵犀的全部历史记录。')) return;
     await dbClear();
@@ -935,7 +946,9 @@ let frozen      = false;
 
 function dogZone() {
     const W = window.innerWidth, H = window.innerHeight;
-    return { minX: 48, maxX: W - DOG_W - 48, minY: H * 0.65, maxY: H * 0.88 };
+    const z = { minX: 48, maxX: W - DOG_W - 48, minY: H * 0.65, maxY: H * 0.88 };
+    if (z.maxY <= z.minY) z.maxY = z.minY + 1;   // 防止极小窗口除以 0
+    return z;
 }
 function dogScale(y) {
     const z = dogZone();
@@ -1255,6 +1268,7 @@ class MeteorParticle {
 }
 
 function triggerMeteorShower() {
+    if (document.getElementById('meteorOverlay')) return;   // 防止重叠
     const count   = parseInt(localStorage.getItem('lingxi_meteor_count') || '0');
     const isFirst = count === 0;
     localStorage.setItem('lingxi_meteor_count', String(count + 1));
@@ -1364,6 +1378,9 @@ function triggerMeteorShower() {
     wishBox.querySelector('#wishSubmit').addEventListener('click', async () => {
         const text = wishBox.querySelector('#wishInput').value.trim();
         if (!text) return;
+        const btn = wishBox.querySelector('#wishSubmit');
+        btn.disabled = true;
+        btn.textContent = '放进去了…';
         await dbWishSave(text);
         closeOverlay();
     });
@@ -1443,10 +1460,16 @@ async function openWishPanel() {
         txt.textContent = wish.wish_text;
 
         row.addEventListener('click', async () => {
+            const prevLit = wish.lit;
             wish.lit = wish.lit ? 0 : 1;
             setStarStyle(wish.lit);
             txt.style.color = wish.lit ? 'rgba(255,255,210,0.82)' : 'rgba(255,255,255,0.38)';
-            await dbWishToggle(wish.id);
+            const ok = await dbWishToggle(wish.id);
+            if (!ok) {   // 失败时回滚 UI
+                wish.lit = prevLit;
+                setStarStyle(wish.lit);
+                txt.style.color = wish.lit ? 'rgba(255,255,210,0.82)' : 'rgba(255,255,255,0.38)';
+            }
         });
 
         row.appendChild(star); row.appendChild(txt);
@@ -1758,6 +1781,8 @@ async function speakText(text, btnEl) {
         };
         audio.play().catch(e => {
             console.error('[TTS] play() rejected:', e);
+            currentAudio = null;
+            if (btnEl) btnEl.classList.remove('speaking');
             speakWebSpeech(clean, btnEl);
         });
 
@@ -1875,7 +1900,11 @@ function showInlineMiniWish(stressLevel) {
                 const data = await resp.json();
                 const wishLine = data?.choices?.[0]?.message?.content?.trim();
                 if (wishLine) {
-                    setTimeout(() => appendAiMsg(wishLine), 500);
+                    setTimeout(() => {
+                        appendAiMsg(wishLine);
+                        msgHistory.push({ role: 'assistant', content: wishLine });
+                        dbSave('assistant', wishLine);
+                    }, 500);
                 }
             }
         } catch (e) {
@@ -1895,11 +1924,6 @@ window.send = sendEnhanced;  // used by voice recognition auto-send
 async function sendEnhanced() {
     const rawText = chatInput.value.trim();
     if (!rawText || isStreaming) return;
-
-    // ── Wish detection: keyword check on user text (primary, reliable)
-    // AI [WISH] tag is checked after reply as a secondary signal (see below)
-    const WISH_PATTERN = /想要|希望|愿望|许愿|想学|好想|真想|要是|如果能|多希望|梦想|期待|盼望|渴望|想拥有|想成为|要是有|要是能|好希望|要能|能有就好|就好了/;
-    const userWantsWish = WISH_PATTERN.test(rawText);
 
     chatInput.value = '';
     chatInput.style.height = 'auto';
@@ -2000,7 +2024,7 @@ async function sendEnhanced() {
                         inContinueMode  = false;
                         lowStressStreak = 0;
                         stressTotal     = 0;
-                        stressTriggered = false;
+                        // stressTriggered 保持 true，防止退出后立刻重新触发干预
                         setTimeout(() => {
                             const bubble = appendAiMsg('好一点了吗？');
                             const meteorBtn = document.createElement('button');
@@ -2046,8 +2070,8 @@ async function sendEnhanced() {
         // ── Feature 1: image generation ──
         maybeGenerateImage(aiText, aiEl);
 
-        // ── Wish trigger: keyword match OR AI [WISH] tag, whichever fires ──
-        if (userWantsWish || /\[WISH\]/i.test(aiText)) {
+        // ── Wish trigger: AI [WISH] semantic tag only ──
+        if (/\[WISH\]/i.test(aiText)) {
             setTimeout(() => showInlineMiniWish(stressTotal), 700);
         }
 
