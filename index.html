@@ -752,6 +752,63 @@ let stressTriggered  = false;
 let inContinueMode   = false;   // 用户选"继续说说"后激活
 let lowStressStreak  = 0;       // 连续低压力回复计数
 
+// ── Time context ─────────────────────────────────────────────────────────────
+function getTimeContext() {
+    const now = new Date();
+    const m = now.getMonth() + 1, d = now.getDate();
+    const seasons = ['冬','冬','春','春','春','夏','夏','夏','秋','秋','秋','冬'];
+    return `今天是${now.getFullYear()}年${m}月${d}日，${seasons[m - 1]}季。`;
+}
+
+// ── Proactive opener ──────────────────────────────────────────────────────────
+async function maybeShowProactiveOpener() {
+    const lastVisit = parseInt(localStorage.getItem('lingxi_last_visit') || '0');
+    const hadStress = localStorage.getItem('lingxi_had_stress') === '1';
+    const daysSince = (Date.now() - lastVisit) / (1000 * 60 * 60 * 24);
+
+    const shouldOpen = hadStress || daysSince > 3;
+    if (!shouldOpen || !msgHistory.length) return;
+
+    // Clear flags before opening
+    localStorage.removeItem('lingxi_had_stress');
+
+    const reason = daysSince > 3
+        ? `用户已经 ${Math.floor(daysSince)} 天没来了。`
+        : '用户上次聊天情绪比较沉。';
+
+    const proactiveEl = document.createElement('div');
+    proactiveEl.className = 'msg msg-ai typing';
+    chatMsgs.appendChild(proactiveEl);
+    scrollBottom();
+
+    try {
+        const r = await fetch(API_URL + '/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'deepseek-chat',
+                stream: false,
+                max_tokens: 80,
+                messages: [
+                    { role: 'system', content: `你是灵犀。${reason}${userSummary ? ' 关于这个用户：' + userSummary : ''} 用一句温柔自然的话开口，像老朋友重逢，不要说"你好"，不要客套，直接进入感觉。只输出那一句话，不要任何标记符号。` },
+                    { role: 'user', content: '（回来了）' },
+                ],
+            }),
+        });
+        if (r.ok) {
+            const data = await r.json();
+            const line = data?.choices?.[0]?.message?.content?.trim() || '';
+            if (line) {
+                proactiveEl.classList.remove('typing');
+                proactiveEl.innerHTML = renderMd(line);
+                scrollBottom();
+                return;
+            }
+        }
+    } catch (_) {}
+    proactiveEl.remove();
+}
+
 // Open / close
 let historyLoaded = false;
 openChatBtn.addEventListener('click', async () => {
@@ -761,6 +818,8 @@ openChatBtn.addEventListener('click', async () => {
     if (!historyLoaded) {
         historyLoaded = true;
         trackEvent('chat_open');
+        const prevVisit = parseInt(localStorage.getItem('lingxi_last_visit') || '0');
+        localStorage.setItem('lingxi_last_visit', String(Date.now()));
         // 并行加载：历史记录 + 摘要 + 愿望缓存
         const [history, summary, wishes] = await Promise.all([
             dbHistory(), dbSummaryGet(), dbWishList(),
@@ -790,6 +849,8 @@ openChatBtn.addEventListener('click', async () => {
             divider2.textContent = '─── 当前会话 ───';
             chatMsgs.appendChild(divider2);
             scrollBottom();
+            // 主动开场（低频）：上次高压 或 3天未访问
+            maybeShowProactiveOpener();
         } else {
             appendAiMsg('你好。\n有什么想说的，或者不想说的，都可以。');
         }
@@ -1628,6 +1689,7 @@ const ADVICE_LINES = [
 ];
 
 function showStressIntervention() {
+    localStorage.setItem('lingxi_had_stress', '1');
     const el = document.createElement('div');
     el.className = 'msg msg-ai stress-intervention';
     el.innerHTML = `
@@ -2391,6 +2453,7 @@ async function sendEnhanced() {
                 model: 'deepseek-chat',
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'system', content: getTimeContext() },
                     ...(userSummary ? [{ role: 'system', content: `用户近期画像：${userSummary}` }] : []),
                     ...(wishContextHint ? [{ role: 'system', content: wishContextHint }] : []),
                     ...msgHistory.slice(-15),
