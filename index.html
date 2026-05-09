@@ -179,7 +179,7 @@
         }
         #clearMemory:hover, #newSession:hover, #receiptBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         /* Receipt selection mode */
-        #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; }
+        #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; user-select: none; }
         #chatMessages.select-mode .msg:hover { opacity: 0.8; }
         #chatMessages.select-mode .msg.receipt-selected {
             outline: 1px solid rgba(196,149,106,0.5);
@@ -2164,25 +2164,25 @@ function enterReceiptMode() {
     `;
     chatPanel.appendChild(bar);
 
-    // Make messages selectable
-    chatMsgs.querySelectorAll('.msg').forEach(msg => {
-        msg._receiptHandler = () => {
-            if (receiptSelected.includes(msg)) {
-                receiptSelected.splice(receiptSelected.indexOf(msg), 1);
-                msg.classList.remove('receipt-selected');
-            } else if (receiptSelected.length < 3) {
-                receiptSelected.push(msg);
-                msg.classList.add('receipt-selected');
-            }
-            const cnt = receiptSelected.length;
-            document.getElementById('receiptCount').textContent =
-                cnt === 0 ? '点击消息选择（最多3条）' : `已选 ${cnt}/3 条`;
-            const genBtn = document.getElementById('receiptGenerate');
-            if (cnt > 0) { genBtn.style.opacity = '1'; genBtn.style.pointerEvents = 'auto'; }
-            else { genBtn.style.opacity = '0.4'; genBtn.style.pointerEvents = 'none'; }
-        };
-        msg.addEventListener('click', msg._receiptHandler);
-    });
+    // 事件委托：一个监听器挂在容器上，不影响移动端滚动
+    chatMsgs._receiptDelegate = (e) => {
+        const msg = e.target.closest('.msg');
+        if (!msg) return;
+        if (receiptSelected.includes(msg)) {
+            receiptSelected.splice(receiptSelected.indexOf(msg), 1);
+            msg.classList.remove('receipt-selected');
+        } else if (receiptSelected.length < 3) {
+            receiptSelected.push(msg);
+            msg.classList.add('receipt-selected');
+        }
+        const cnt = receiptSelected.length;
+        document.getElementById('receiptCount').textContent =
+            cnt === 0 ? '点击消息选择（最多3条）' : `已选 ${cnt}/3 条`;
+        const genBtn = document.getElementById('receiptGenerate');
+        if (cnt > 0) { genBtn.style.opacity = '1'; genBtn.style.pointerEvents = 'auto'; }
+        else { genBtn.style.opacity = '0.4'; genBtn.style.pointerEvents = 'none'; }
+    };
+    chatMsgs.addEventListener('click', chatMsgs._receiptDelegate);
 
     document.getElementById('receiptGenerate').addEventListener('click', () => {
         if (receiptSelected.length === 0) return;
@@ -2196,13 +2196,11 @@ function exitReceiptMode() {
     receiptMode = false;
     receiptSelected.length = 0;
     chatMsgs.classList.remove('select-mode');
-    chatMsgs.querySelectorAll('.msg').forEach(msg => {
-        msg.classList.remove('receipt-selected');
-        if (msg._receiptHandler) {
-            msg.removeEventListener('click', msg._receiptHandler);
-            delete msg._receiptHandler;
-        }
-    });
+    chatMsgs.querySelectorAll('.msg').forEach(msg => msg.classList.remove('receipt-selected'));
+    if (chatMsgs._receiptDelegate) {
+        chatMsgs.removeEventListener('click', chatMsgs._receiptDelegate);
+        delete chatMsgs._receiptDelegate;
+    }
     document.getElementById('receiptBar')?.remove();
     document.getElementById('receiptBtn').textContent = '小票';
 }
