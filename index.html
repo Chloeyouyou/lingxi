@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>灵犀 LingXi</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1008">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="灵犀">
+    <link rel="apple-touch-icon" href="xg.png">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         /* ── RESET ── */
@@ -2392,6 +2399,13 @@ function showCrisisPopup() {
 
 chatSendBtn.addEventListener('click', sendEnhanced);
 window.send = sendEnhanced;  // used by voice recognition auto-send
+
+// ── PWA Service Worker registration ──────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+}
 
 async function sendEnhanced() {
     const rawText = chatInput.value.trim();
