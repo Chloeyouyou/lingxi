@@ -179,7 +179,7 @@
         }
         #clearMemory:hover, #newSession:hover, #receiptBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         /* Receipt selection mode */
-        #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; user-select: none; }
+        #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; user-select: none; touch-action: manipulation; }
         #chatMessages.select-mode .msg:hover { opacity: 0.8; }
         #chatMessages.select-mode .msg.receipt-selected {
             outline: 1px solid rgba(196,149,106,0.5);
@@ -206,6 +206,7 @@
             padding: 28px clamp(16px, 8vw, 120px);
             display: flex; flex-direction: column; gap: 20px;
             scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
         #chatMessages::-webkit-scrollbar { width: 3px; }
         #chatMessages::-webkit-scrollbar-track { background: transparent; }
@@ -2162,7 +2163,7 @@ function enterReceiptMode() {
         <span id="receiptCount">点击消息选择（最多3条）</span>
         <button id="receiptGenerate" style="padding:5px 14px;border:1px solid rgba(196,149,106,0.4);border-radius:14px;background:rgba(196,149,106,0.12);color:rgba(255,220,160,0.85);font-size:0.75rem;font-family:inherit;cursor:pointer;opacity:0.4;pointer-events:none;">生成小票</button>
     `;
-    chatPanel.appendChild(bar);
+    document.body.appendChild(bar);
 
     // 事件委托：一个监听器挂在容器上，不影响移动端滚动
     chatMsgs._receiptDelegate = (e) => {
