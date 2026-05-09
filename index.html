@@ -187,7 +187,7 @@
             background: rgba(196,149,106,0.06);
         }
         #receiptBar {
-            position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%);
+            position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
             background: rgba(20,15,8,0.92); backdrop-filter: blur(10px);
             border: 1px solid rgba(196,149,106,0.3); border-radius: 24px;
             padding: 8px 18px; display: flex; align-items: center; gap: 12px;
@@ -868,9 +868,14 @@ closeChatBtn.addEventListener('click', () => {
     heroEl.classList.remove('hidden');
 });
 document.getElementById('newSession').addEventListener('click', () => {
-    chatMsgs.innerHTML = '';
     msgHistory = [];
-    historyLoaded = true;   // 不再从 D1 重载历史，本次从空白开始
+    historyLoaded = true;
+    // 加分隔线，保留旧消息（往上滚可查看）
+    const sep = document.createElement('div');
+    sep.className = 'history-divider';
+    sep.style.cssText = 'margin: 12px 0; border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 12px;';
+    sep.textContent = `─── 新对话 · ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} ───`;
+    chatMsgs.appendChild(sep);
     appendAiMsg('嗯，我在。\n之前的一切都还在，只是先放一放。');
 });
 
@@ -2157,7 +2162,6 @@ function enterReceiptMode() {
         <span id="receiptCount">点击消息选择（最多3条）</span>
         <button id="receiptGenerate" style="padding:5px 14px;border:1px solid rgba(196,149,106,0.4);border-radius:14px;background:rgba(196,149,106,0.12);color:rgba(255,220,160,0.85);font-size:0.75rem;font-family:inherit;cursor:pointer;opacity:0.4;pointer-events:none;">生成小票</button>
     `;
-    chatPanel.style.position = 'relative';
     chatPanel.appendChild(bar);
 
     // Make messages selectable
