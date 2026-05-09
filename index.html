@@ -606,12 +606,16 @@ const SYSTEM_PROMPT = `# 角色
 - 杜绝使用"我理解你""我明白"这类空洞共情表达。
 - 不切换到"专家"或"顾问"角色，防止对话陷入机械循环。
 - 语言朴素自然，不过度诗意化。
+- 括号动作（如"（停顿）""（笑）"）每次回复最多出现一次，且不能出现在第一句；两段内容之间如需停顿，用空行表示，不堆叠动作描写。
+- 当用户消息明显是吐槽、玩笑或日常琐事时，停留在那个频率里回应，不主动串联之前的沉重话题，不做情感深化。
+- 意象是工具，不是必须。只在它自然浮现的时候用，不要每次都上。用过之后，在回复末尾加 [USED_IMAGE:关键词] 记录，下次回复前检查近5条是否重复。
 
 ## 系统标记（用户看不到）
 
 回复末尾加 [SKETCH: 英文主体 | 情绪] —— 仅在适合配图时。情绪三选一：warm and healing / light and cheerful / quiet companionship。负面场景只用猫狗。
 回复末尾加 [STRESS:X] —— X 是 0-10 整数，按整体判断，不机械计分。
-如果用户消息里明确含有愿望、期待或希望某件事发生的语义，加 [WISH] 标记。`;
+如果用户消息里明确含有愿望、期待或希望某件事发生的语义，加 [WISH] 标记。
+如果你判断用户正处于严重的情绪危机、有伤害自己的念头，或明显需要专业支持，在本次回复末尾加 [CRISIS] 标记。仅在真正需要时使用。`;
 
 const API_URL = 'https://lingxi-proxy.2025105150104.workers.dev';
 
@@ -815,7 +819,7 @@ async function send() {
                 model: 'deepseek-chat',
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
-                    ...msgHistory,
+                    ...msgHistory.slice(-15),
                 ],
                 stream: true,
                 max_tokens: 1000,
@@ -1233,6 +1237,8 @@ function stripSystemTags(text) {
         .replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '')
         .replace(/\[STRESS:\d+\]/gi, '')
         .replace(/\[WISH\]/gi, '')
+        .replace(/\[CRISIS\]/gi, '')
+        .replace(/\[USED_IMAGE:[^\]]*\]/gi, '')
         .trim();
 }
 
@@ -1475,7 +1481,76 @@ async function openWishPanel() {
             }
         });
 
-        row.appendChild(star); row.appendChild(txt);
+        // "和灵犀聊聊这个" 入口
+        const chatLink = document.createElement('span');
+        chatLink.textContent = '聊聊';
+        chatLink.title = '和灵犀聊聊这个愿望';
+        Object.assign(chatLink.style, {
+            fontSize: '0.68rem', color: 'rgba(196,149,106,0.45)',
+            letterSpacing: '0.08em', cursor: 'pointer',
+            marginLeft: 'auto', flexShrink: '0',
+            transition: 'color 0.2s',
+        });
+        chatLink.onmouseenter = () => chatLink.style.color = 'rgba(196,149,106,0.85)';
+        chatLink.onmouseleave = () => chatLink.style.color = 'rgba(196,149,106,0.45)';
+        chatLink.addEventListener('click', e => {
+            e.stopPropagation();
+            panel.remove();
+            // 注入愿望上下文，让灵犀从具体问题切入
+            msgHistory.push({
+                role: 'system',
+                content: `用户有一个愿望："${wish.wish_text}"。接下来他可能想聊这件事。请从一个具体的问题自然切入，不要说"我看到你的愿望是"，不要总结，不要铺垫。`,
+            });
+            chatPanel.classList.add('open');
+            appendAiMsg('…');   // 触发灵犀主动开口
+            // 用 sendEnhanced 逻辑触发一条空消息让灵犀先说
+            setTimeout(async () => {
+                const el = chatMsgs.lastElementChild;
+                if (el) el.remove();
+                const aiEl = document.createElement('div');
+                aiEl.className = 'msg msg-ai typing';
+                chatMsgs.appendChild(aiEl);
+                scrollBottom();
+                try {
+                    const resp = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [
+                                { role: 'system', content: SYSTEM_PROMPT },
+                                ...msgHistory.slice(-15),
+                            ],
+                            stream: true, max_tokens: 400,
+                        }),
+                    });
+                    aiEl.classList.remove('typing');
+                    const reader = resp.body.getReader();
+                    const dec = new TextDecoder();
+                    let txt = '';
+                    outer: while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        for (const line of dec.decode(value, { stream: true }).split('\n')) {
+                            if (!line.startsWith('data: ')) continue;
+                            const d = line.slice(6).trim();
+                            if (d === '[DONE]') break outer;
+                            try {
+                                const delta = JSON.parse(d)?.choices?.[0]?.delta?.content || '';
+                                if (delta) { txt += delta; aiEl.innerHTML = renderMd(stripSystemTags(txt)); scrollBottom(); }
+                            } catch (_) {}
+                        }
+                    }
+                    aiEl.innerHTML = renderMd(stripSystemTags(txt));
+                    msgHistory.push({ role: 'assistant', content: txt });
+                    dbSave('assistant', txt);
+                } catch (e) {
+                    aiEl.innerHTML = '<em style="opacity:0.5">出了点问题</em>';
+                }
+            }, 100);
+        });
+
+        row.appendChild(star); row.appendChild(txt); row.appendChild(chatLink);
         list.appendChild(row);
     });
     panel.appendChild(list);
@@ -1504,9 +1579,10 @@ function showStressIntervention() {
     el.innerHTML = `
         <span style="opacity:0.6; font-size:0.85em;">灵犀悄悄说</span><br><br>
         我注意到你最近压力有点大。<br>你现在是想让我陪你说说，还是想听听我的想法？
-        <div style="margin-top:14px; display:flex; gap:10px;">
+        <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
             <button class="stress-btn" id="stressContinue">继续说说</button>
             <button class="stress-btn" id="stressAdvice">听听想法</button>
+            <button class="stress-btn" id="stressPause">先暂停一下</button>
         </div>
     `;
     chatMsgs.appendChild(el);
@@ -1542,6 +1618,18 @@ function showStressIntervention() {
         });
         bubble.appendChild(meteorBtn);
         scrollBottom();
+    });
+
+    // ── 先暂停一下 ────────────────────────────────────────────
+    el.querySelector('#stressPause').addEventListener('click', () => {
+        removeStressButtons(el);
+        const PAUSE_HINTS = [
+            '先喝口水。回来我还在。',
+            '把手机屏幕朝下放三十秒。不用想什么。',
+            '站起来，抖一下手腕。就这个。',
+        ];
+        const hint = PAUSE_HINTS[Math.floor(Math.random() * PAUSE_HINTS.length)];
+        appendAiMsg(hint);
     });
 }
 
@@ -1921,6 +2009,50 @@ function showInlineMiniWish(stressLevel) {
     closeBtn.addEventListener('click', dismiss);
 }
 
+// ── Crisis support popup ─────────────────────────────────────────
+function showCrisisPopup() {
+    if (document.getElementById('crisisPopup')) return;
+    const el = document.createElement('div');
+    el.id = 'crisisPopup';
+    Object.assign(el.style, {
+        position: 'fixed', bottom: '100px', left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'min(380px, 88vw)',
+        background: 'rgba(20,15,10,0.82)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(196,149,106,0.2)',
+        borderRadius: '16px',
+        padding: '18px 22px',
+        zIndex: '8000',
+        color: 'rgba(255,255,220,0.78)',
+        fontSize: '0.82rem',
+        lineHeight: '1.8',
+        letterSpacing: '0.04em',
+        fontFamily: "'Noto Serif SC', serif",
+        opacity: '0',
+        transition: 'opacity 0.6s ease',
+        cursor: 'pointer',
+    });
+    el.innerHTML = `
+        <div style="margin-bottom:10px;color:rgba(196,149,106,0.7);font-size:0.75rem;letter-spacing:0.12em;">灵犀想到了什么</div>
+        或许，如果你想找个人说说话——有一条热线可以试试。
+        我也没把握它是否适合你，你愿意的话可以测评一下，再告诉我。<br><br>
+        <span style="color:rgba(255,220,160,0.9);letter-spacing:0.08em;">希望24热线　400-161-9995</span><br>
+        <span style="opacity:0.45;font-size:0.72rem;">24小时 · 免费 · 全国</span>
+        <div style="margin-top:14px;opacity:0.3;font-size:0.7rem;text-align:right;">点击任意处关闭</div>
+    `;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+
+    function dismiss() {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 600);
+    }
+    el.addEventListener('click', dismiss);
+    // 90秒后自动消失
+    setTimeout(dismiss, 90000);
+}
+
 chatSendBtn.addEventListener('click', sendEnhanced);
 window.send = sendEnhanced;  // used by voice recognition auto-send
 
@@ -1970,7 +2102,7 @@ async function sendEnhanced() {
                 model: 'deepseek-chat',
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
-                    ...msgHistory,
+                    ...msgHistory.slice(-15),
                 ],
                 stream: true,
                 max_tokens: 1200,
@@ -2076,6 +2208,11 @@ async function sendEnhanced() {
         // ── Wish trigger: AI [WISH] semantic tag only ──
         if (/\[WISH\]/i.test(aiText)) {
             setTimeout(() => showInlineMiniWish(stressTotal), 700);
+        }
+
+        // ── Crisis support popup: AI [CRISIS] tag ──
+        if (/\[CRISIS\]/i.test(aiText)) {
+            setTimeout(() => showCrisisPopup(), 1000);
         }
 
     } catch (err) {
