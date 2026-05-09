@@ -244,7 +244,80 @@ async function handleRequest(request, env, origin) {
             }
         }
 
+        // ── Route: /db/summarize  ────────────────────────────────
+        if (url.pathname === '/db/summarize') {
+            const { messages } = body;
+            if (!Array.isArray(messages) || messages.length === 0)
+                return jsonErr(cors(origin), 400, 'Missing messages');
+            await ensureSummaryTable(env.DB);
+            const key = env.DEEPSEEK_API_KEY;
+            let summaryText = '';
+            try {
+                const up = await fetch('https://api.deepseek.com/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                    body: JSON.stringify({
+                        model: 'deepseek-chat', stream: false, max_tokens: 200,
+                        messages: [
+                            { role: 'system', content: '根据以下对话片段，提炼该用户的简短画像，包括：常提到的话题、情绪模式、隐含欲望、近期状态。用四个短句列出，不超过100字，不加解释。' },
+                            ...messages,
+                        ],
+                    }),
+                });
+                const data = await up.json();
+                summaryText = data?.choices?.[0]?.message?.content?.trim() || '';
+            } catch (e) { return jsonErr(cors(origin), 502, 'Summarize fetch failed: ' + e.message); }
+
+            await env.DB.prepare(
+                'INSERT INTO summaries (user_id, summary_text, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET summary_text=excluded.summary_text, updated_at=excluded.updated_at'
+            ).bind(user_id, summaryText, Date.now()).run();
+            return new Response(JSON.stringify({ ok: true, summary: summaryText }), { status: 200, headers: h });
+        }
+
+        // ── Route: /db/summary/get  ──────────────────────────────
+        if (url.pathname === '/db/summary/get') {
+            await ensureSummaryTable(env.DB);
+            const result = await env.DB.prepare(
+                'SELECT summary_text FROM summaries WHERE user_id = ?'
+            ).bind(user_id).first();
+            return new Response(JSON.stringify({ summary: result?.summary_text || '' }), { status: 200, headers: h });
+        }
+
+        // ── Route: /db/event  ────────────────────────────────────
+        if (url.pathname === '/db/event') {
+            await ensureEventTable(env.DB);
+            const { event_type, ts, meta } = body;
+            if (!event_type) return jsonErr(cors(origin), 400, 'Missing event_type');
+            await env.DB.prepare(
+                'INSERT INTO events (user_id, event_type, ts, meta) VALUES (?, ?, ?, ?)'
+            ).bind(user_id, event_type, ts || Date.now(), meta ? JSON.stringify(meta) : null).run();
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+        }
+
         return new Response('Not Found', { status: 404 });
+}
+
+async function ensureSummaryTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS summaries (
+            user_id      TEXT PRIMARY KEY,
+            summary_text TEXT NOT NULL,
+            updated_at   INTEGER NOT NULL
+        )`),
+    ]);
+}
+
+async function ensureEventTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS events (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    TEXT    NOT NULL,
+            event_type TEXT    NOT NULL,
+            ts         INTEGER NOT NULL,
+            meta       TEXT    DEFAULT NULL
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_event_user ON events(user_id, ts)`),
+    ]);
 }
 
 async function ensureWishTable(db) {

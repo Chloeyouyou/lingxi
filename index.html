@@ -164,13 +164,29 @@
             border-left: 2px solid rgba(196,149,106,0.4);
             padding-left: 14px;
         }
-        #clearMemory, #newSession {
+        #clearMemory, #newSession, #receiptBtn {
             color: rgba(196,149,106,0.55); font-size: 0.72rem;
             letter-spacing: 0.08em; padding: 4px 10px;
             border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
             transition: color 0.2s, border-color 0.2s;
         }
-        #clearMemory:hover, #newSession:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #clearMemory:hover, #newSession:hover, #receiptBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        /* Receipt selection mode */
+        #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; }
+        #chatMessages.select-mode .msg:hover { opacity: 0.8; }
+        #chatMessages.select-mode .msg.receipt-selected {
+            outline: 1px solid rgba(196,149,106,0.5);
+            border-radius: 8px;
+            background: rgba(196,149,106,0.06);
+        }
+        #receiptBar {
+            position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%);
+            background: rgba(20,15,8,0.92); backdrop-filter: blur(10px);
+            border: 1px solid rgba(196,149,106,0.3); border-radius: 24px;
+            padding: 8px 18px; display: flex; align-items: center; gap: 12px;
+            font-size: 0.78rem; color: rgba(255,255,220,0.75); white-space: nowrap;
+            z-index: 200;
+        }
         .history-divider {
             align-self: center; color: rgba(255,255,255,0.2);
             font-size: 0.72rem; letter-spacing: 0.12em;
@@ -394,6 +410,7 @@
     <div id="chatHeader">
         <span id="chatTitle">灵 · 犀</span>
         <div style="display:flex;gap:8px;align-items:center;">
+            <button id="receiptBtn" title="生成对话小票">小票</button>
             <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
             <button id="clearMemory" title="清空对话记忆">清空记忆</button>
         </div>
@@ -689,6 +706,36 @@ async function dbWishToggle(wishId) {
     } catch (e) { console.warn('[DB] wish toggle failed', e); return false; }
 }
 
+async function dbSummarize(messages) {
+    try {
+        const r = await fetch(API_URL + '/db/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID, messages }),
+        });
+        if (!r.ok) return null;
+        return (await r.json()).summary || null;
+    } catch (e) { console.warn('[DB] summarize failed', e); return null; }
+}
+async function dbSummaryGet() {
+    try {
+        const r = await fetch(API_URL + '/db/summary/get', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID }),
+        });
+        if (!r.ok) return '';
+        return (await r.json()).summary || '';
+    } catch (e) { console.warn('[DB] summary get failed', e); return ''; }
+}
+function trackEvent(event_type, meta) {
+    fetch(API_URL + '/db/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: LINGXI_UID, event_type, ts: Date.now(), meta }),
+    }).catch(() => {});
+}
+
 const chatPanel    = document.getElementById('chatPanel');
 const chatMsgs     = document.getElementById('chatMessages');
 const chatInput    = document.getElementById('chatInput');
@@ -697,8 +744,9 @@ const openChatBtn  = document.getElementById('openChat');
 const closeChatBtn = document.getElementById('closeChat');
 const heroEl       = document.getElementById('hero');
 
-let msgHistory = [];  // [{role, content}]
-let isStreaming = false;
+let msgHistory   = [];  // [{role, content}]
+let userSummary  = '';  // 历史压缩摘要
+let isStreaming  = false;
 let stressTotal      = 0;
 let stressTriggered  = false;
 let inContinueMode   = false;   // 用户选"继续说说"后激活
@@ -712,7 +760,13 @@ openChatBtn.addEventListener('click', async () => {
     chatInput.focus();
     if (!historyLoaded) {
         historyLoaded = true;
-        const history = await dbHistory();
+        trackEvent('chat_open');
+        // 并行加载：历史记录 + 摘要 + 愿望缓存
+        const [history, summary, wishes] = await Promise.all([
+            dbHistory(), dbSummaryGet(), dbWishList(),
+        ]);
+        if (summary) userSummary = summary;
+        if (wishes.length) cachedWishes = wishes;
         if (history.length > 0) {
             const divider = document.createElement('div');
             divider.className = 'history-divider';
@@ -1590,6 +1644,7 @@ function showStressIntervention() {
 
     // ── 继续说说 ──────────────────────────────────────────────
     el.querySelector('#stressContinue').addEventListener('click', () => {
+        trackEvent('stress_triggered', { choice: 'continue' });
         removeStressButtons(el);
         // 注入灵犀内心独白（role:assistant，用户不可见）
         msgHistory.push({
@@ -1622,6 +1677,7 @@ function showStressIntervention() {
 
     // ── 先暂停一下 ────────────────────────────────────────────
     el.querySelector('#stressPause').addEventListener('click', () => {
+        trackEvent('pause_used');
         removeStressButtons(el);
         const PAUSE_HINTS = [
             '先喝口水。回来我还在。',
@@ -1968,6 +2024,7 @@ function showInlineMiniWish(stressLevel) {
         submitBtn.disabled = true;
         submitBtn.textContent = '放进去了…';
         await dbWishSave(text);
+        trackEvent('wish_saved');
         dismiss();
         startJarGlow();
         // Lingxi generates her own wish from conversation context
@@ -2007,6 +2064,224 @@ function showInlineMiniWish(stressLevel) {
         if (e.key === 'Escape') closeBtn.click();
     });
     closeBtn.addEventListener('click', dismiss);
+}
+
+// ── Receipt generation ───────────────────────────────────────────
+let receiptMode = false;
+const receiptSelected = [];
+
+document.getElementById('receiptBtn').addEventListener('click', () => {
+    if (receiptMode) { exitReceiptMode(); return; }
+    enterReceiptMode();
+});
+
+function enterReceiptMode() {
+    receiptMode = true;
+    receiptSelected.length = 0;
+    chatMsgs.classList.add('select-mode');
+    document.getElementById('receiptBtn').textContent = '取消';
+
+    // Floating bar
+    const bar = document.createElement('div');
+    bar.id = 'receiptBar';
+    bar.innerHTML = `
+        <span id="receiptCount">点击消息选择（最多3条）</span>
+        <button id="receiptGenerate" style="padding:5px 14px;border:1px solid rgba(196,149,106,0.4);border-radius:14px;background:rgba(196,149,106,0.12);color:rgba(255,220,160,0.85);font-size:0.75rem;font-family:inherit;cursor:pointer;opacity:0.4;pointer-events:none;">生成小票</button>
+    `;
+    chatPanel.style.position = 'relative';
+    chatPanel.appendChild(bar);
+
+    // Make messages selectable
+    chatMsgs.querySelectorAll('.msg').forEach(msg => {
+        msg._receiptHandler = () => {
+            if (receiptSelected.includes(msg)) {
+                receiptSelected.splice(receiptSelected.indexOf(msg), 1);
+                msg.classList.remove('receipt-selected');
+            } else if (receiptSelected.length < 3) {
+                receiptSelected.push(msg);
+                msg.classList.add('receipt-selected');
+            }
+            const cnt = receiptSelected.length;
+            document.getElementById('receiptCount').textContent =
+                cnt === 0 ? '点击消息选择（最多3条）' : `已选 ${cnt}/3 条`;
+            const genBtn = document.getElementById('receiptGenerate');
+            if (cnt > 0) { genBtn.style.opacity = '1'; genBtn.style.pointerEvents = 'auto'; }
+            else { genBtn.style.opacity = '0.4'; genBtn.style.pointerEvents = 'none'; }
+        };
+        msg.addEventListener('click', msg._receiptHandler);
+    });
+
+    document.getElementById('receiptGenerate').addEventListener('click', () => {
+        if (receiptSelected.length === 0) return;
+        generateReceipt(receiptSelected);
+        trackEvent('receipt_generated', { count: receiptSelected.length });
+        exitReceiptMode();
+    });
+}
+
+function exitReceiptMode() {
+    receiptMode = false;
+    receiptSelected.length = 0;
+    chatMsgs.classList.remove('select-mode');
+    chatMsgs.querySelectorAll('.msg').forEach(msg => {
+        msg.classList.remove('receipt-selected');
+        if (msg._receiptHandler) {
+            msg.removeEventListener('click', msg._receiptHandler);
+            delete msg._receiptHandler;
+        }
+    });
+    document.getElementById('receiptBar')?.remove();
+    document.getElementById('receiptBtn').textContent = '小票';
+}
+
+function generateReceipt(msgEls) {
+    const SCALE = 2, W = 360, PAD = 28, LINE = 22;
+    const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+    // Collect text content
+    const entries = msgEls.map(el => ({
+        isUser: el.classList.contains('msg-user'),
+        text: (el.innerText || el.textContent).trim().replace(/\s+/g, ' '),
+    }));
+
+    // Measure canvas height
+    const cvs = document.createElement('canvas');
+    const ctx = cvs.getContext('2d');
+    cvs.width = W * SCALE;
+
+    function setFont(size, weight = '400') {
+        ctx.font = `${weight} ${size * SCALE}px "Noto Serif SC", serif`;
+    }
+    function measureWrapped(text, maxW) {
+        let line = '', lines = 0;
+        for (const ch of text) {
+            if (ctx.measureText(line + ch).width > maxW) { lines++; line = ch; }
+            else line += ch;
+        }
+        return lines + 1;
+    }
+
+    setFont(12);
+    let estimatedH = 120; // header
+    entries.forEach(e => {
+        estimatedH += 28 + measureWrapped(e.text, (W - PAD * 2) * SCALE) * LINE * SCALE;
+    });
+    estimatedH += 80; // footer
+
+    cvs.height = estimatedH * SCALE;
+
+    // Draw background
+    ctx.fillStyle = '#faf8f3';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+    // Jagged top edge
+    ctx.fillStyle = '#faf8f3';
+    const teeth = 12;
+    const tw = cvs.width / teeth;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    for (let i = 0; i <= teeth; i++) {
+        ctx.lineTo(i * tw, i % 2 === 0 ? 14 * SCALE : 0);
+    }
+    ctx.lineTo(cvs.width, 0);
+    ctx.closePath();
+    ctx.fillStyle = '#1a1008';
+    // Actually draw the top sawtooth as white cutout
+    ctx.fillStyle = '#faf8f3';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    for (let i = 0; i <= teeth; i++) {
+        ctx.lineTo(i * tw, i % 2 === 0 ? 0 : 14 * SCALE);
+    }
+    ctx.lineTo(cvs.width, 0);
+    ctx.lineTo(cvs.width, -20);
+    ctx.lineTo(0, -20);
+    ctx.closePath();
+    ctx.fill();
+
+    let y = 30 * SCALE;
+
+    // Header
+    ctx.fillStyle = '#1a1008';
+    ctx.textAlign = 'center';
+    setFont(18, '400');
+    ctx.fillText('灵 · 犀', cvs.width / 2, y); y += 28 * SCALE;
+    setFont(9);
+    ctx.fillStyle = '#8a7060';
+    ctx.fillText(dateStr, cvs.width / 2, y); y += 20 * SCALE;
+
+    // Dashed separator
+    function drawDash(yy) {
+        ctx.setLineDash([6 * SCALE, 5 * SCALE]);
+        ctx.strokeStyle = 'rgba(90,60,30,0.2)';
+        ctx.lineWidth = 1 * SCALE;
+        ctx.beginPath();
+        ctx.moveTo(PAD * SCALE, yy);
+        ctx.lineTo((W - PAD) * SCALE, yy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    drawDash(y); y += 14 * SCALE;
+
+    // Messages
+    const maxW = (W - PAD * 2) * SCALE;
+    entries.forEach(e => {
+        ctx.textAlign = e.isUser ? 'right' : 'left';
+        ctx.fillStyle = e.isUser ? '#4a3828' : '#1a1008';
+        setFont(10);
+        const label = e.isUser ? '你' : '灵犀';
+        ctx.fillText(label, e.isUser ? (W - PAD) * SCALE : PAD * SCALE, y);
+        y += LINE * SCALE;
+
+        ctx.fillStyle = '#2a1e14';
+        setFont(11);
+        let line = '';
+        for (const ch of e.text) {
+            if (ctx.measureText(line + ch).width > maxW) {
+                ctx.fillText(line, e.isUser ? (W - PAD) * SCALE : PAD * SCALE, y);
+                y += LINE * SCALE;
+                line = ch;
+            } else line += ch;
+        }
+        if (line) { ctx.fillText(line, e.isUser ? (W - PAD) * SCALE : PAD * SCALE, y); y += LINE * SCALE; }
+        y += 10 * SCALE;
+    });
+
+    drawDash(y); y += 18 * SCALE;
+
+    // Footer: extract shortest phrase
+    const shortest = [...entries].sort((a, b) => a.text.length - b.text.length)[0];
+    const phrase = shortest.text.slice(0, 18);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#9a7a60';
+    setFont(9);
+    ctx.fillText(`"${phrase}"`, cvs.width / 2, y); y += 20 * SCALE;
+    ctx.fillStyle = '#c4956a';
+    setFont(8);
+    ctx.fillText('· · ·', cvs.width / 2, y);
+
+    // Jagged bottom
+    ctx.fillStyle = '#faf8f3';
+    ctx.beginPath();
+    ctx.moveTo(0, cvs.height);
+    for (let i = 0; i <= teeth; i++) {
+        ctx.lineTo(i * tw, cvs.height - (i % 2 === 0 ? 0 : 14 * SCALE));
+    }
+    ctx.lineTo(cvs.width, cvs.height);
+    ctx.lineTo(cvs.width, cvs.height + 20);
+    ctx.lineTo(0, cvs.height + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Download
+    cvs.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `lingxi-${dateStr}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/png');
 }
 
 // ── Crisis support popup ─────────────────────────────────────────
@@ -2093,6 +2368,20 @@ async function sendEnhanced() {
     chatMsgs.appendChild(aiEl);
     scrollBottom();
 
+    // ── Wish association: match user message against cached wishes ──
+    let wishContextHint = null;
+    if (cachedWishes && cachedWishes.length > 0) {
+        const normalized = rawText.replace(/[\s，。！？、]/g, '');
+        const matched = cachedWishes.find(w => {
+            const wn = w.wish_text.replace(/[\s，。！？、]/g, '');
+            for (let i = 0; i < wn.length - 1; i++) {
+                if (normalized.includes(wn.slice(i, i + 2))) return true;
+            }
+            return false;
+        });
+        if (matched) wishContextHint = `用户曾有一个愿望："${matched.wish_text}"。如果对话自然流向这里，可以轻轻提起，不要刻意。`;
+    }
+
     let aiText = '';
     try {
         const resp = await fetch(API_URL, {
@@ -2102,6 +2391,8 @@ async function sendEnhanced() {
                 model: 'deepseek-chat',
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
+                    ...(userSummary ? [{ role: 'system', content: `用户近期画像：${userSummary}` }] : []),
+                    ...(wishContextHint ? [{ role: 'system', content: wishContextHint }] : []),
                     ...msgHistory.slice(-15),
                 ],
                 stream: true,
@@ -2198,6 +2489,16 @@ async function sendEnhanced() {
 
         msgHistory.push({ role: 'assistant', content: aiText });
         dbSave('assistant', aiText);
+        trackEvent('ai_reply');
+
+        // ── 历史压缩：超过20条时压缩前15条 ──
+        if (msgHistory.length > 20) {
+            const toCompress = msgHistory.slice(0, 15);
+            msgHistory = msgHistory.slice(15);
+            dbSummarize(toCompress).then(summary => {
+                if (summary) userSummary = summary;
+            });
+        }
 
         // ── Feature 4: auto TTS ──
         speakText(aiText, ttsBtn);
@@ -2212,6 +2513,7 @@ async function sendEnhanced() {
 
         // ── Crisis support popup: AI [CRISIS] tag ──
         if (/\[CRISIS\]/i.test(aiText)) {
+            trackEvent('crisis_popup');
             setTimeout(() => showCrisisPopup(), 1000);
         }
 
