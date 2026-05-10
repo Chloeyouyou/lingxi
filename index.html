@@ -171,13 +171,13 @@
             border-left: 2px solid rgba(196,149,106,0.4);
             padding-left: 14px;
         }
-        #clearMemory, #newSession, #receiptBtn {
+        #clearMemory, #newSession, #receiptBtn, #historyBtn {
             color: rgba(196,149,106,0.55); font-size: 0.72rem;
             letter-spacing: 0.08em; padding: 4px 10px;
             border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
             transition: color 0.2s, border-color 0.2s;
         }
-        #clearMemory:hover, #newSession:hover, #receiptBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #clearMemory:hover, #newSession:hover, #receiptBtn:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         /* Receipt selection mode */
         #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; user-select: none; touch-action: manipulation; }
         #chatMessages.select-mode .msg:hover { opacity: 0.8; }
@@ -379,6 +379,49 @@
         #wishPanel::-webkit-scrollbar { width: 3px; }
         #wishPanel::-webkit-scrollbar-thumb { background: rgba(196,149,106,0.3); border-radius: 2px; }
 
+        /* ── SESSIONS PANEL ── */
+        #sessionsPanel {
+            position: fixed; inset: 0; z-index: 300;
+            background: rgba(10,5,2,0.96);
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #sessionsPanel.open { opacity: 1; pointer-events: auto; }
+        #sessionsHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 28px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        #sessionsHeader span { color: rgba(255,255,255,0.7); font-size: 0.9rem; letter-spacing: 0.15em; }
+        #sessionsClose { color: rgba(255,255,255,0.5); font-size: 1.4rem; padding: 4px 8px; }
+        #sessionsClose:hover { color: rgba(255,255,255,0.9); }
+        #sessionsList {
+            flex: 1; overflow-y: auto; padding: 16px 28px;
+            display: flex; flex-direction: column; gap: 10px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .session-item {
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 12px 16px; cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .session-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(196,149,106,0.4); }
+        .session-item .s-date { font-size: 0.72rem; color: rgba(196,149,106,0.7); letter-spacing: 0.06em; margin-bottom: 4px; }
+        .session-item .s-preview { font-size: 0.82rem; color: rgba(255,255,255,0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .session-item .s-count { font-size: 0.68rem; color: rgba(255,255,255,0.25); margin-top: 4px; }
+        #sessionsViewHeader {
+            display: flex; align-items: center; gap: 12px;
+            padding: 16px 28px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        #sessionsViewBack { color: rgba(196,149,106,0.7); font-size: 0.8rem; padding: 4px 10px; border: 1px solid rgba(196,149,106,0.3); border-radius: 12px; }
+        #sessionsViewBack:hover { color: rgba(196,149,106,1); border-color: rgba(196,149,106,0.6); }
+        #sessionsViewTitle { color: rgba(255,255,255,0.5); font-size: 0.78rem; letter-spacing: 0.08em; }
+        #sessionsViewMsgs { flex: 1; overflow-y: auto; padding: 20px clamp(16px,8vw,120px); display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 480px) {
             #switcher { top: 14px; right: 14px; gap: 7px; }
@@ -420,11 +463,21 @@
         <div style="display:flex;gap:8px;align-items:center;">
             <button id="receiptBtn" title="生成对话小票">小票</button>
             <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
-            <button id="clearMemory" title="清空对话记忆">清空记忆</button>
+            <button id="historyBtn" title="历史对话">历史</button>
+            <button id="clearMemory" title="归档当前对话，开始新篇">清空记忆</button>
         </div>
         <button id="closeChat">×</button>
     </div>
     <div id="chatMessages"></div>
+
+    <!-- Sessions panel -->
+    <div id="sessionsPanel">
+        <div id="sessionsHeader">
+            <span>历史对话</span>
+            <button id="sessionsClose">×</button>
+        </div>
+        <div id="sessionsList"></div>
+    </div>
     <div id="chatInputArea">
         <!-- mic -->
         <button class="btn-icon" id="micBtn" title="语音输入">
@@ -651,35 +704,58 @@ const LINGXI_UID = (() => {
     return id;
 })();
 
+// ── Session identity (each "新对话" or "清空" creates a new session) ──
+function newSession() {
+    const sid = crypto.randomUUID();
+    localStorage.setItem('lingxi_session_id', sid);
+    return sid;
+}
+let currentSession = (() => {
+    let sid = localStorage.getItem('lingxi_session_id');
+    if (!sid) sid = newSession();
+    return sid;
+})();
+
 // ── D1 memory helpers ──
 async function dbSave(role, content) {
     try {
         await fetch(API_URL + '/db/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: LINGXI_UID, role, content }),
+            body: JSON.stringify({ user_id: LINGXI_UID, role, content, session_id: currentSession }),
         });
     } catch (e) { console.warn('[DB] save failed', e); }
 }
-async function dbHistory() {
+async function dbHistory(sid) {
     try {
         const r = await fetch(API_URL + '/db/history', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: LINGXI_UID }),
+            body: JSON.stringify({ user_id: LINGXI_UID, session_id: sid ?? currentSession }),
         });
         if (!r.ok) return [];
         return (await r.json()).messages || [];
     } catch (e) { console.warn('[DB] history failed', e); return []; }
 }
-async function dbClear() {
+async function dbClear(sid) {
     try {
         await fetch(API_URL + '/db/clear', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: LINGXI_UID }),
+            body: JSON.stringify({ user_id: LINGXI_UID, session_id: sid ?? currentSession }),
         });
     } catch (e) { console.warn('[DB] clear failed', e); }
+}
+async function dbSessions() {
+    try {
+        const r = await fetch(API_URL + '/db/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: LINGXI_UID }),
+        });
+        if (!r.ok) return [];
+        return (await r.json()).sessions || [];
+    } catch (e) { console.warn('[DB] sessions failed', e); return []; }
 }
 
 // ── Wish DB helpers ──
@@ -869,9 +945,9 @@ closeChatBtn.addEventListener('click', () => {
     heroEl.classList.remove('hidden');
 });
 document.getElementById('newSession').addEventListener('click', () => {
+    currentSession = newSession();
     msgHistory = [];
     historyLoaded = true;
-    // 加分隔线，保留旧消息（往上滚可查看）
     const sep = document.createElement('div');
     sep.className = 'history-divider';
     sep.style.cssText = 'margin: 12px 0; border-top: 1px dashed rgba(255,255,255,0.12); padding-top: 12px;';
@@ -881,12 +957,12 @@ document.getElementById('newSession').addEventListener('click', () => {
 });
 
 document.getElementById('clearMemory').addEventListener('click', async () => {
-    if (!confirm('清空所有对话记忆？这将删除你和灵犀的全部历史记录。')) return;
-    await dbClear();
+    if (!confirm('归档当前对话并开始新篇？旧对话在"历史"里仍可查看。\n（若要彻底删除，请在历史面板中操作）')) return;
+    currentSession = newSession();
     chatMsgs.innerHTML = '';
     msgHistory = [];
-    historyLoaded = false;
-    appendAiMsg('记忆已清空。\n一切重新开始。');
+    historyLoaded = true;
+    appendAiMsg('新的开始。\n之前说的都还在，随时可以去看。');
 });
 
 // Render simple markdown: bold, italic, newlines (sanitized)
@@ -2398,6 +2474,101 @@ function showCrisisPopup() {
     el.addEventListener('click', dismiss);
     // 90秒后自动消失
     setTimeout(dismiss, 90000);
+}
+
+// ── Sessions / History panel ──────────────────────────────────────────────────
+const sessionsPanel = document.getElementById('sessionsPanel');
+document.getElementById('historyBtn').addEventListener('click', () => openSessionsPanel());
+document.getElementById('sessionsClose').addEventListener('click', () => closeSessionsPanel());
+
+function closeSessionsPanel() {
+    sessionsPanel.classList.remove('open');
+}
+
+async function openSessionsPanel() {
+    sessionsPanel.classList.add('open');
+    // Remove any existing view
+    const existingView = document.getElementById('sessionsViewHeader');
+    if (existingView) { existingView.remove(); document.getElementById('sessionsViewMsgs')?.remove(); }
+
+    const list = document.getElementById('sessionsList');
+    list.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;padding:20px 0;">加载中…</div>';
+    list.style.display = 'flex';
+
+    const sessions = await dbSessions();
+    list.innerHTML = '';
+
+    if (!sessions.length) {
+        list.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:0.82rem;padding:20px 0;text-align:center;">还没有历史对话</div>';
+        return;
+    }
+
+    sessions.forEach(s => {
+        const sid = s.session_id;
+        const isCurrent = sid === currentSession;
+        const startDate = new Date(s.started).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const endDate   = new Date(s.ended).toLocaleDateString('zh-CN',   { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        const item = document.createElement('div');
+        item.className = 'session-item';
+        item.innerHTML = `
+            <div class="s-date">${startDate} — ${endDate}${isCurrent ? ' &nbsp;<span style="color:rgba(196,149,106,0.8);font-size:0.68rem;">当前</span>' : ''}</div>
+            <div class="s-count">${s.msg_count} 条消息</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <button class="stress-btn" style="font-size:0.72rem;padding:4px 12px;" data-view="${sid}">查看</button>
+                ${!isCurrent ? `<button class="stress-btn" style="font-size:0.72rem;padding:4px 12px;opacity:0.5;" data-del="${sid}">删除</button>` : ''}
+            </div>`;
+        list.appendChild(item);
+    });
+
+    // View button
+    list.querySelectorAll('[data-view]').forEach(btn => {
+        btn.addEventListener('click', () => viewSession(btn.dataset.view));
+    });
+    // Delete button
+    list.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('永久删除这段对话？')) return;
+            await dbClear(btn.dataset.del);
+            btn.closest('.session-item').remove();
+        });
+    });
+}
+
+async function viewSession(sid) {
+    const list = document.getElementById('sessionsList');
+    list.style.display = 'none';
+
+    // Build view header
+    const vh = document.createElement('div');
+    vh.id = 'sessionsViewHeader';
+    vh.innerHTML = `<button id="sessionsViewBack" class="stress-btn">← 返回</button><span id="sessionsViewTitle">历史对话</span>`;
+    sessionsPanel.insertBefore(vh, list);
+
+    const vm = document.createElement('div');
+    vm.id = 'sessionsViewMsgs';
+    vm.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:0.8rem;">加载中…</div>';
+    sessionsPanel.insertBefore(vm, list);
+
+    document.getElementById('sessionsViewBack').addEventListener('click', () => {
+        vh.remove(); vm.remove();
+        list.style.display = 'flex';
+    });
+
+    const messages = await dbHistory(sid);
+    vm.innerHTML = '';
+    if (!messages.length) {
+        vm.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:0.82rem;">这段对话是空的</div>';
+        return;
+    }
+    messages.forEach(m => {
+        const el = document.createElement('div');
+        el.className = m.role === 'user' ? 'msg msg-user' : 'msg msg-ai';
+        if (m.role === 'user') el.textContent = m.content;
+        else el.innerHTML = renderMd(stripSystemTags(m.content));
+        vm.appendChild(el);
+    });
+    vm.scrollTop = vm.scrollHeight;
 }
 
 chatSendBtn.addEventListener('click', sendEnhanced);

@@ -187,26 +187,48 @@ async function handleRequest(request, env, origin) {
 
             // POST /db/save
             if (url.pathname === '/db/save') {
-                const { role, content } = body;
+                const { role, content, session_id: sid } = body;
                 if (!role || !content) return jsonErr(cors(origin), 400, 'Missing role/content');
                 await env.DB.prepare(
-                    'INSERT INTO messages (user_id, role, content, ts) VALUES (?, ?, ?, ?)'
-                ).bind(user_id, role, content, Date.now()).run();
+                    'INSERT INTO messages (user_id, role, content, ts, session_id) VALUES (?, ?, ?, ?, ?)'
+                ).bind(user_id, role, content, Date.now(), sid || null).run();
                 return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
             }
 
             // POST /db/history
             if (url.pathname === '/db/history') {
-                const result = await env.DB.prepare(
-                    'SELECT role, content, ts FROM messages WHERE user_id = ? ORDER BY ts DESC LIMIT 50'
-                ).bind(user_id).all();
+                const { session_id: sid } = body;
+                let result;
+                if (sid) {
+                    result = await env.DB.prepare(
+                        'SELECT role, content, ts FROM messages WHERE user_id = ? AND session_id = ? ORDER BY ts DESC LIMIT 50'
+                    ).bind(user_id, sid).all();
+                } else {
+                    result = await env.DB.prepare(
+                        'SELECT role, content, ts FROM messages WHERE user_id = ? AND session_id IS NULL ORDER BY ts DESC LIMIT 50'
+                    ).bind(user_id).all();
+                }
                 const messages = (result.results || []).reverse();
                 return new Response(JSON.stringify({ messages }), { status: 200, headers: h });
             }
 
-            // POST /db/clear
+            // POST /db/sessions  — list all archived sessions
+            if (url.pathname === '/db/sessions') {
+                const result = await env.DB.prepare(
+                    `SELECT session_id, MIN(ts) as started, MAX(ts) as ended, COUNT(*) as msg_count
+                     FROM messages WHERE user_id = ? GROUP BY session_id ORDER BY started DESC LIMIT 30`
+                ).bind(user_id).all();
+                return new Response(JSON.stringify({ sessions: result.results || [] }), { status: 200, headers: h });
+            }
+
+            // POST /db/clear  — delete only current session's messages
             if (url.pathname === '/db/clear') {
-                await env.DB.prepare('DELETE FROM messages WHERE user_id = ?').bind(user_id).run();
+                const { session_id: sid } = body;
+                if (sid) {
+                    await env.DB.prepare('DELETE FROM messages WHERE user_id = ? AND session_id = ?').bind(user_id, sid).run();
+                } else {
+                    await env.DB.prepare('DELETE FROM messages WHERE user_id = ? AND session_id IS NULL').bind(user_id).run();
+                }
                 return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
             }
 
@@ -336,14 +358,17 @@ async function ensureWishTable(db) {
 async function ensureTable(db) {
     await db.batch([
         db.prepare(`CREATE TABLE IF NOT EXISTS messages (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT    NOT NULL,
-            role    TEXT    NOT NULL,
-            content TEXT    NOT NULL,
-            ts      INTEGER NOT NULL
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    TEXT    NOT NULL,
+            role       TEXT    NOT NULL,
+            content    TEXT    NOT NULL,
+            ts         INTEGER NOT NULL,
+            session_id TEXT    DEFAULT NULL
         )`),
         db.prepare(`CREATE INDEX IF NOT EXISTS idx_user_ts ON messages(user_id, ts)`),
     ]);
+    // Migration for existing tables: add session_id column if absent
+    try { await db.prepare('ALTER TABLE messages ADD COLUMN session_id TEXT DEFAULT NULL').run(); } catch (_) {}
 }
 
 function jsonErr(corsH, status, msg) {
