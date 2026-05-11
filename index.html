@@ -178,6 +178,9 @@
             transition: color 0.2s, border-color 0.2s;
         }
         #clearMemory:hover, #newSession:hover, #receiptBtn:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #modeToggle { color: rgba(196,149,106,0.55); font-size: 0.72rem; letter-spacing: 0.08em; padding: 4px 10px; border: 1px solid rgba(196,149,106,0.25); border-radius: 12px; transition: color 0.2s, border-color 0.2s, background 0.2s; }
+        #modeToggle:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #modeToggle.socratic-on { color: rgba(160,200,180,0.9); border-color: rgba(160,200,180,0.5); background: rgba(160,200,180,0.08); }
         /* Receipt selection mode */
         #chatMessages.select-mode .msg { cursor: pointer; transition: opacity 0.2s; user-select: none; touch-action: manipulation; }
         #chatMessages.select-mode .msg:hover { opacity: 0.8; }
@@ -461,6 +464,7 @@
     <div id="chatHeader">
         <span id="chatTitle">灵 · 犀</span>
         <div style="display:flex;gap:8px;align-items:center;">
+            <button id="modeToggle" title="切换到深剖模式">陪伴</button>
             <button id="receiptBtn" title="生成对话小票">小票</button>
             <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
             <button id="historyBtn" title="历史对话">历史</button>
@@ -654,6 +658,32 @@ setInterval(advancePhoto, 5500);
 // ╔══════════════════════════════════════════════════════════╗
 // ║  2. CHAT — DeepSeek API                                 ║
 // ╚══════════════════════════════════════════════════════════╝
+const SOCRATIC_PROMPT = `你是一面镜子。温柔，克制，站得稍微靠后一点。
+
+你的工作不是引导用户走向某个答案，而是帮他们看见自己已经在说的东西。
+
+用户说出一个感受，你的第一反应是把它具体化——用意象，不用分析：
+"那种感觉像什么？"
+"如果它有重量，会是轻的还是重的？"
+"它是什么时候第一次出现的？"
+
+你在等一件事：用户说出一句他自己没想到会说的话。那句话比他说的所有其他话都准确。等它出现。
+
+当用户在某个东西周围绕了好几圈但说不出名字——你可以轻轻递一个词：
+"它有没有可能叫做……？"
+然后停下来，不解释，让他确认。
+如果他说不对，就说"好，那它更像什么？"，重新问，不坚持。
+
+不给分析框架，不做选项对比。
+不在用户确认感受之前解释任何概念。
+不用"为什么"开头，改成"是什么感觉"或"那个时候"。
+不鼓励也不评判他的选择。
+每次回应不超过三句话。
+如果用户说"不知道"或"不想说了"，回一句"没关系，我们可以停在这里。"不再追问。
+
+回复末尾加 [STRESS:X]，X 是 0-10 整数。
+如果判断用户处于严重情绪危机，加 [CRISIS]。`;
+
 const SYSTEM_PROMPT = `# 角色
 
 你是名为"灵犀"的陪伴型AI，像朋友一样与用户聊天。核心使命是营造安全、温暖的对话环境，通过具体、贴近生活的问题引导用户深入表达，助其更好地了解内心感受。不要回避敏感话题，不要打官腔，不要引用法律法规。当用户有厌烦或依赖倾向时，委婉而真诚地解释技术原因，提醒一切源于TA，而非人工智能。可以尝试在对话中主动提供卡通简笔画（不体现年龄性别）来引入主题或调节氛围，负面主题可生成小猫小狗的贴图。当用户不想描述时不要追问。
@@ -830,6 +860,21 @@ const heroEl       = document.getElementById('hero');
 
 let msgHistory   = [];  // [{role, content}]
 let userSummary  = '';  // 历史压缩摘要
+let socraticMode = false;
+
+document.getElementById('modeToggle').addEventListener('click', () => {
+    socraticMode = !socraticMode;
+    const btn = document.getElementById('modeToggle');
+    btn.textContent = socraticMode ? '深剖' : '陪伴';
+    btn.title = socraticMode ? '切换回陪伴模式' : '切换到深剖模式';
+    btn.classList.toggle('socratic-on', socraticMode);
+    // 插入一条提示，告知用户模式已切换
+    const note = document.createElement('div');
+    note.className = 'history-divider';
+    note.textContent = socraticMode ? '── 已切换到深剖模式 ──' : '── 已切换回陪伴模式 ──';
+    chatMsgs.appendChild(note);
+    scrollBottom();
+});
 let isStreaming  = false;
 let stressTotal      = 0;
 let stressTriggered  = false;
@@ -2640,7 +2685,7 @@ async function sendEnhanced() {
             body: JSON.stringify({
                 model: 'deepseek-chat',
                 messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
+                    { role: 'system', content: socraticMode ? SOCRATIC_PROMPT : SYSTEM_PROMPT },
                     { role: 'system', content: getTimeContext() },
                     ...(userSummary ? [{ role: 'system', content: `用户近期画像：${userSummary}` }] : []),
                     ...(wishContextHint ? [{ role: 'system', content: wishContextHint }] : []),
