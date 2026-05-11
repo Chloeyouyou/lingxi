@@ -4791,7 +4791,7 @@ async function dbWishSessionSave() {
             depth: wishBottleData.depth || '',
             depth_label: wishBottleData.depthLabel || '',
             steps_done: doneSteps.length,
-            steps_json: JSON.stringify(doneSteps.map(s => s.text)),
+            steps_json: JSON.stringify(wishBottleData.steps.map(s => ({ text: s.text, status: s.status }))),
             avoid_types: JSON.stringify(avoidTypes),
             coaching_json: JSON.stringify(wishBottleData.coachingHistory || []),
             created_at: wishBottleData.startedAt || Date.now(),
@@ -4876,13 +4876,17 @@ function renderArchiveList(sessions) {
             <button class="wa-continue-btn" data-idx="${idx}">继续这个愿望</button>`;
         listEl.appendChild(item);
 
-        // 填入完成步骤
+        // 填入步骤
         if (hasSteps) {
             const stepsEl = item.querySelector(`#waSteps${idx}`);
-            stepsArr.forEach(text => {
+            stepsArr.forEach(s => {
                 const line = document.createElement('div');
+                // 兼容旧格式（纯字符串）和新格式（{text, status}）
+                const text = typeof s === 'string' ? s : s.text;
+                const done = typeof s === 'object' && s.status === 'done';
                 line.className = 'wa-step-line';
-                line.textContent = text;
+                line.style.color = done ? 'rgba(100,200,130,0.55)' : 'rgba(255,255,255,0.3)';
+                line.textContent = (done ? '✦ ' : '· ') + text;
                 stepsEl.appendChild(line);
             });
         }
