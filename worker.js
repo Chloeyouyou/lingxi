@@ -291,9 +291,10 @@ async function handleRequest(request, env, origin) {
                 if (url.pathname === '/db/profile/refresh') {
                     await ensureSummaryTable(env.DB);
                     await ensureWishNotesTable(env.DB);
+                    await ensureWishSessionTable(env.DB);
                     const key = env.DEEPSEEK_API_KEY;
 
-                    // 拉最近30条消息
+                    // 拉最近30条对话消息
                     const msgResult = await env.DB.prepare(
                         'SELECT role, content FROM messages WHERE user_id = ? ORDER BY ts DESC LIMIT 30'
                     ).bind(user_id).all();
@@ -305,12 +306,28 @@ async function handleRequest(request, env, origin) {
                     ).bind(user_id).all();
                     const notes = noteResult.results || [];
 
-                    if (recentMsgs.length === 0 && notes.length === 0)
+                    // 拉最近10条已归档愿望会话
+                    const sessionResult = await env.DB.prepare(
+                        'SELECT wish_text, direction, depth, steps_done, avoid_types FROM wish_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
+                    ).bind(user_id).all();
+                    const sessions = sessionResult.results || [];
+
+                    if (recentMsgs.length === 0 && notes.length === 0 && sessions.length === 0)
                         return new Response(JSON.stringify({ ok: true, summary: '' }), { status: 200, headers: h });
 
-                    const notesBlock = notes.length > 0
-                        ? '\n\n用户的愿望笔记（真实感受/行动后反思）：\n' + notes.map(n => `[${n.wish_text}${n.direction ? '·' + n.direction : ''}] ${n.note_text}`).join('\n')
-                        : '';
+                    // 拼成富文本背景
+                    let contextBlock = '';
+
+                    if (sessions.length > 0) {
+                        contextBlock += '\n\n用户的愿望历史（已完成/归档）：\n' + sessions.map(s => {
+                            const avoids = (() => { try { return JSON.parse(s.avoid_types || '[]'); } catch { return []; } })();
+                            return `愿望："${s.wish_text}"，方向：${s.direction || '未选'}，类型：${s.depth === 'short' ? '短期' : '长期'}，完成${s.steps_done}步${avoids.length ? '，回避类型：' + avoids.join('、') : ''}`;
+                        }).join('\n');
+                    }
+
+                    if (notes.length > 0) {
+                        contextBlock += '\n\n用户的步骤反馈笔记（行动中的真实感受）：\n' + notes.map(n => `[${n.wish_text}${n.direction ? '·' + n.direction : ''}] ${n.note_text}`).join('\n');
+                    }
 
                     let summaryText = '';
                     try {
@@ -320,9 +337,9 @@ async function handleRequest(request, env, origin) {
                             body: JSON.stringify({
                                 model: 'deepseek-chat', stream: false, max_tokens: 200,
                                 messages: [
-                                    { role: 'system', content: '根据以下对话记录和用户的愿望笔记，提炼该用户的简短画像，包括：常提到的话题、情绪模式、隐含欲望、近期状态、行动风格。用四到五个短句列出，不超过120字，不加解释。' },
+                                    { role: 'system', content: '根据以下对话记录、愿望历史和行动笔记，提炼该用户的简短画像，包括：常提到的话题、情绪模式、隐含欲望、行动风格、回避倾向。用四到五个短句列出，不超过150字，不加解释。' },
                                     ...recentMsgs.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
-                                    ...(notesBlock ? [{ role: 'user', content: notesBlock }] : []),
+                                    ...(contextBlock ? [{ role: 'user', content: contextBlock }] : []),
                                 ],
                             }),
                         });
