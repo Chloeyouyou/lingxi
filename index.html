@@ -671,6 +671,13 @@
         .wa-item-wish { font-size:0.88rem; color:rgba(255,255,255,0.72); margin-bottom:6px; line-height:1.5; }
         .wa-item-dir { font-size:0.78rem; color:rgba(196,149,106,0.55); margin-bottom:5px; }
         .wa-item-meta { font-size:0.72rem; color:rgba(255,255,255,0.28); display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+        .wa-coaching-toggle { font-size:0.72rem; color:rgba(196,149,106,0.5); background:none; border:none; padding:0; cursor:pointer; letter-spacing:0.03em; margin-bottom:6px; }
+        .wa-coaching-toggle:hover { color:rgba(196,149,106,0.8); }
+        .wa-coaching-history { display:none; margin:8px 0 10px; padding:10px 12px; background:rgba(255,255,255,0.02); border-radius:10px; border:1px solid rgba(255,255,255,0.05); }
+        .wa-coaching-history.open { display:block; }
+        .wa-coach-line { font-size:0.8rem; line-height:1.6; padding:3px 0; }
+        .wa-coach-line.ai { color:rgba(255,255,255,0.55); }
+        .wa-coach-line.user { color:rgba(255,220,160,0.65); text-align:right; }
         .wa-continue-btn {
             padding:4px 12px; border-radius:10px; font-size:0.72rem; font-family:inherit;
             border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.4);
@@ -4701,6 +4708,7 @@ async function dbWishSessionSave() {
             depth_label: wishBottleData.depthLabel || '',
             steps_done: doneSteps.length,
             avoid_types: JSON.stringify(avoidTypes),
+            coaching_json: JSON.stringify(wishBottleData.coachingHistory || []),
             created_at: wishBottleData.startedAt || Date.now(),
             ended_at: Date.now()
         })
@@ -4752,7 +4760,7 @@ function renderArchiveList(sessions) {
         return;
     }
     listEl.innerHTML = '';
-    sessions.forEach(s => {
+    sessions.forEach((s, idx) => {
         const item = document.createElement('div');
         item.className = 'wa-item';
 
@@ -4761,6 +4769,11 @@ function renderArchiveList(sessions) {
         const depthStr = s.depth_label || (s.depth === 'short' ? '短期' : '长期');
         const wishShort = (s.wish_text || '').slice(0, 22) + ((s.wish_text || '').length > 22 ? '…' : '');
 
+        // 解析教练对话
+        let coachingHistory = [];
+        try { coachingHistory = JSON.parse(s.coaching_json || '[]'); } catch { coachingHistory = []; }
+        const hasCoaching = coachingHistory.length > 0;
+
         item.innerHTML = `
             <div class="wa-item-wish">${wishShort}</div>
             <div class="wa-item-meta">
@@ -4768,8 +4781,30 @@ function renderArchiveList(sessions) {
                 <span>${depthStr} ${dirStr}</span>
                 <span>完成 ${s.steps_done || 0} 步</span>
             </div>
-            <button class="wa-continue-btn" data-idx="${sessions.indexOf(s)}">继续这个愿望</button>`;
+            ${hasCoaching ? `<button class="wa-coaching-toggle" data-idx="${idx}">▸ 查看深度对话（${coachingHistory.length} 条）</button><div class="wa-coaching-history" id="waCoach${idx}"></div>` : ''}
+            <button class="wa-continue-btn" data-idx="${idx}">继续这个愿望</button>`;
         listEl.appendChild(item);
+
+        // 填入教练对话内容
+        if (hasCoaching) {
+            const historyEl = item.querySelector(`#waCoach${idx}`);
+            coachingHistory.forEach(m => {
+                const line = document.createElement('div');
+                line.className = `wa-coach-line ${m.role === 'ai' ? 'ai' : 'user'}`;
+                line.textContent = m.content;
+                historyEl.appendChild(line);
+            });
+        }
+    });
+
+    // 展开/收起教练对话
+    listEl.querySelectorAll('.wa-coaching-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = btn.dataset.idx;
+            const historyEl = document.getElementById(`waCoach${idx}`);
+            const isOpen = historyEl.classList.toggle('open');
+            btn.textContent = (isOpen ? '▾' : '▸') + btn.textContent.slice(1);
+        });
     });
 
     listEl.querySelectorAll('.wa-continue-btn').forEach(btn => {
@@ -4784,9 +4819,13 @@ function loadWishFromArchive(session) {
     document.getElementById('wishArchivePanel').classList.remove('open');
     let scope = null;
     try { scope = JSON.parse(session.scope_json || '{}'); } catch { scope = {}; }
+    let coachingHistory = [];
+    try { coachingHistory = JSON.parse(session.coaching_json || '[]'); } catch { coachingHistory = []; }
     wishBottleData = {
         wish: session.wish_text || '',
         chosenDirection: session.direction || '',
+        coachingHistory: coachingHistory,
+        coachingSummary: session.direction || '',
         scope: scope,
         steps: [],
         phase: 'scoping',
