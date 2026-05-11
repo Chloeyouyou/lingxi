@@ -171,13 +171,13 @@
             border-left: 2px solid rgba(196,149,106,0.4);
             padding-left: 14px;
         }
-        #clearMemory, #newSession, #receiptBtn, #historyBtn {
+        #clearMemory, #newSession, #receiptBtn, #apiReceiptBtn, #historyBtn, #openWishBottleChat {
             color: rgba(196,149,106,0.55); font-size: 0.72rem;
             letter-spacing: 0.08em; padding: 4px 10px;
             border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
             transition: color 0.2s, border-color 0.2s;
         }
-        #clearMemory:hover, #newSession:hover, #receiptBtn:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #clearMemory:hover, #newSession:hover, #receiptBtn:hover, #apiReceiptBtn:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         #modeToggle { color: rgba(196,149,106,0.55); font-size: 0.72rem; letter-spacing: 0.08em; padding: 4px 10px; border: 1px solid rgba(196,149,106,0.25); border-radius: 12px; transition: color 0.2s, border-color 0.2s, background 0.2s; }
         #modeToggle:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         #modeToggle.socratic-on { color: rgba(160,200,180,0.9); border-color: rgba(160,200,180,0.5); background: rgba(160,200,180,0.08); }
@@ -197,6 +197,29 @@
             font-size: 0.78rem; color: rgba(255,255,220,0.75); white-space: nowrap;
             z-index: 200;
         }
+        /* ── 小票预览弹窗 ── */
+        #receiptPreviewOverlay {
+            position: fixed; inset: 0; z-index: 500;
+            background: rgba(10,8,4,0.82); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s;
+        }
+        #receiptPreviewOverlay.open { opacity: 1; pointer-events: auto; }
+        #receiptPreviewBox {
+            background: transparent;
+            display: flex; flex-direction: column; align-items: center; gap: 16px;
+            max-height: 92vh; overflow-y: auto; padding: 16px;
+        }
+        #receiptPreviewBox img { max-width: min(400px, 92vw); border-radius: 4px; display: block; }
+        .receipt-preview-btns { display: flex; gap: 12px; }
+        .receipt-preview-btns button {
+            padding: 9px 24px; border-radius: 20px; font-size: 0.8rem; font-family: inherit;
+            border: 1px solid rgba(196,149,106,0.4); cursor: pointer; transition: background 0.2s;
+        }
+        #receiptSaveBtn { background: rgba(196,149,106,0.18); color: rgba(255,220,160,0.9); }
+        #receiptSaveBtn:hover { background: rgba(196,149,106,0.32); }
+        #receiptCloseBtn { background: transparent; color: rgba(255,255,255,0.4); }
+        #receiptCloseBtn:hover { color: rgba(255,255,255,0.75); }
         .history-divider {
             align-self: center; color: rgba(255,255,255,0.2);
             font-size: 0.72rem; letter-spacing: 0.12em;
@@ -425,6 +448,130 @@
         #sessionsViewTitle { color: rgba(255,255,255,0.5); font-size: 0.78rem; letter-spacing: 0.08em; }
         #sessionsViewMsgs { flex: 1; overflow-y: auto; padding: 20px clamp(16px,8vw,120px); display: flex; flex-direction: column; gap: 16px; -webkit-overflow-scrolling: touch; }
 
+        /* ── WISH BOTTLE PANEL ── */
+        #wishBottlePanel {
+            position: fixed; inset: 0; z-index: 350;
+            background: rgba(10,5,2,0.97);
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #wishBottlePanel.open { opacity: 1; pointer-events: auto; }
+        #wishBottleHeader {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 28px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        #wishBottleHeader span { color: rgba(255,255,255,0.7); font-size: 0.9rem; letter-spacing: 0.15em; }
+        #wishBottleClose { color: rgba(255,255,255,0.5); font-size: 1.4rem; padding: 4px 8px; }
+        #wishBottleClose:hover { color: rgba(255,255,255,0.9); }
+        #wishBottleContent { flex: 1; overflow-y: auto; padding: 28px clamp(16px,8vw,100px); -webkit-overflow-scrolling: touch; }
+        #wishBottleText {
+            width: 100%; min-height: 80px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+            color: rgba(255,255,255,0.85); font-family: inherit; font-size: 0.9rem;
+            padding: 14px 16px; resize: none; line-height: 1.7;
+            outline: none; transition: border-color 0.2s;
+        }
+        #wishBottleText:focus { border-color: rgba(196,149,106,0.4); }
+        #wishBottleText::placeholder { color: rgba(255,255,255,0.3); }
+        #wishBottleSubmit {
+            margin-top: 14px; padding: 10px 28px;
+            background: rgba(196,149,106,0.15); border: 1px solid rgba(196,149,106,0.4);
+            border-radius: 20px; color: rgba(196,149,106,0.9);
+            font-size: 0.82rem; font-family: inherit; letter-spacing: 0.1em;
+            transition: background 0.2s;
+        }
+        #wishBottleSubmit:hover { background: rgba(196,149,106,0.28); }
+        #wishBottleSubmit:disabled { opacity: 0.4; pointer-events: none; }
+        .wb-wish-title {
+            font-size: 0.78rem; color: rgba(255,255,255,0.35); letter-spacing: 0.08em;
+            margin-bottom: 20px; padding-bottom: 12px;
+            border-bottom: 1px dashed rgba(255,255,255,0.08);
+        }
+        .wb-step {
+            padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+        }
+        .wb-step-num {
+            flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+            border: 1px solid rgba(196,149,106,0.35); color: rgba(196,149,106,0.7);
+            font-size: 0.72rem; display: flex; align-items: center; justify-content: center;
+            margin-top: 2px;
+        }
+        .wb-step-text { font-size: 0.88rem; color: rgba(255,255,255,0.75); line-height: 1.6; flex: 1; }
+        .wb-step.wb-done .wb-step-num { border-color: rgba(100,180,120,0.4); color: rgba(100,200,130,0.6); }
+        .wb-step.wb-done .wb-step-text { color: rgba(255,255,255,0.3); text-decoration: line-through; }
+        .wb-step-btns { display: flex; gap: 8px; flex-shrink: 0; padding-top: 2px; }
+        .wb-btn { padding: 4px 10px; border-radius: 10px; font-size: 0.75rem; font-family: inherit; border: 1px solid transparent; transition: background 0.2s; }
+        .wb-btn-done { background: rgba(100,180,120,0.12); border-color: rgba(100,180,120,0.3); color: rgba(100,200,130,0.8); }
+        .wb-btn-done:hover { background: rgba(100,180,120,0.25); }
+        .wb-btn-fail { background: rgba(200,100,80,0.1); border-color: rgba(200,100,80,0.25); color: rgba(220,130,110,0.8); }
+        .wb-btn-fail:hover { background: rgba(200,100,80,0.22); }
+        .wb-btn:disabled { opacity: 0.35; pointer-events: none; }
+        .wb-status { font-size: 0.72rem; color: rgba(255,255,255,0.25); padding-top: 4px; }
+        /* ── 愿望瓶：探针对话区 ── */
+        #wbProbeArea { display: none; margin-top: 4px; }
+        .wb-probe-msg {
+            margin-bottom: 14px; font-size: 0.87rem; line-height: 1.65;
+            padding: 10px 14px; border-radius: 12px; max-width: 88%;
+        }
+        .wb-probe-msg.ai {
+            background: rgba(196,149,106,0.08); color: rgba(255,240,210,0.88);
+            border: 1px solid rgba(196,149,106,0.15); align-self: flex-start;
+        }
+        .wb-probe-msg.user {
+            background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.65);
+            border: 1px solid rgba(255,255,255,0.08); margin-left: auto;
+        }
+        #wbProbeMessages { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
+        #wbProbeInputRow { display: flex; gap: 8px; align-items: flex-end; }
+        #wbProbeInput {
+            flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px; padding: 10px 14px; color: rgba(255,255,255,0.82);
+            font-size: 0.85rem; font-family: inherit; resize: none; min-height: 42px; max-height: 100px;
+            outline: none; line-height: 1.5;
+        }
+        #wbProbeInput:focus { border-color: rgba(196,149,106,0.3); }
+        #wbProbeSend {
+            flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(196,149,106,0.18); border: 1px solid rgba(196,149,106,0.35);
+            color: rgba(255,220,160,0.85); font-size: 1rem; display: flex;
+            align-items: center; justify-content: center; transition: background 0.2s;
+        }
+        #wbProbeSend:hover { background: rgba(196,149,106,0.32); }
+        #wbProbeSend:disabled { opacity: 0.3; pointer-events: none; }
+        /* 深度标签 */
+        .wb-depth-tag {
+            display: inline-block; font-size: 0.7rem; padding: 2px 10px;
+            border-radius: 10px; margin-bottom: 14px; letter-spacing: 0.06em;
+        }
+        .wb-depth-short { background: rgba(100,180,160,0.12); border: 1px solid rgba(100,180,160,0.3); color: rgba(140,210,190,0.8); }
+        .wb-depth-long  { background: rgba(180,120,200,0.1);  border: 1px solid rgba(180,120,200,0.28); color: rgba(200,160,220,0.8); }
+        /* 反思区 */
+        #wbReflectArea {
+            margin-top: 20px; padding: 14px 16px;
+            background: rgba(196,149,106,0.06); border: 1px solid rgba(196,149,106,0.14);
+            border-radius: 14px; font-size: 0.87rem; color: rgba(255,240,210,0.82);
+            line-height: 1.7;
+        }
+        #wishBottleClear {
+            margin-top: 28px; font-size: 0.72rem; color: rgba(255,255,255,0.25);
+            letter-spacing: 0.08em; border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 2px; transition: color 0.2s;
+        }
+        #wishBottleClear:hover { color: rgba(255,255,255,0.55); }
+        .btn-wish-bottle {
+            display: inline-block; padding: 10px 32px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.7); font-size: 0.8rem; letter-spacing: 0.18em;
+            border-radius: 50px; font-family: inherit;
+            transition: background 0.3s, transform 0.2s;
+        }
+        .btn-wish-bottle:hover { background: rgba(255,255,255,0.16); transform: translateY(-2px); }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 480px) {
             #switcher { top: 14px; right: 14px; gap: 7px; }
@@ -456,15 +603,47 @@
             <small>专注深度情感陪伴的 AI 对话伙伴</small>
         </div>
         <button class="btn-start" id="openChat">开始对话</button>
+        <button class="btn-wish-bottle" id="openWishBottleHero" style="margin-top:14px;">愿望瓶</button>
     </div>
 </section>
+
+<!-- Wish Bottle panel -->
+<div id="wishBottlePanel">
+    <div id="wishBottleHeader">
+        <span>愿望瓶</span>
+        <button id="wishBottleClose">×</button>
+    </div>
+    <div id="wishBottleContent">
+        <div id="wbInputArea">
+            <textarea id="wishBottleText" placeholder="写下你的愿望，可以很模糊、很大、很不切实际"></textarea>
+            <br>
+            <button id="wishBottleSubmit">放入愿望</button>
+        </div>
+        <div id="wbProbeArea">
+            <div id="wbProbeMessages"></div>
+            <div id="wbProbeInputRow">
+                <textarea id="wbProbeInput" placeholder="说说你的想法…" rows="1"></textarea>
+                <button id="wbProbeSend">↑</button>
+            </div>
+        </div>
+        <div id="wbStepsArea" style="display:none">
+            <div class="wb-wish-title" id="wbWishLabel"></div>
+            <div id="wbDepthTag"></div>
+            <div id="wbStepsList"></div>
+            <div id="wbReflectArea" style="display:none"></div>
+            <button id="wishBottleClear">清空，重新开始</button>
+        </div>
+    </div>
+</div>
 
 <!-- Chat panel -->
 <div id="chatPanel">
     <div id="chatHeader">
         <span id="chatTitle">灵 · 犀</span>
         <div style="display:flex;gap:8px;align-items:center;">
+            <button id="openWishBottleChat" title="愿望瓶">愿望瓶</button>
             <button id="modeToggle" title="切换到深剖模式">陪伴</button>
+            <button id="apiReceiptBtn" title="生成调用小票">调用</button>
             <button id="receiptBtn" title="生成对话小票">小票</button>
             <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
             <button id="historyBtn" title="历史对话">历史</button>
@@ -1931,11 +2110,15 @@ if (SpeechRecognition) {
 const COZE_TTS_VOICE = '7426720361732980745';   // 少年梓辛
 
 const ttsToggle = document.getElementById('ttsToggle');
-let ttsEnabled = true;
+let ttsEnabled = localStorage.getItem('lingxi_tts') !== '0';  // 默认开，记忆用户选择
 let currentAudio = null;   // HTMLAudioElement currently playing
+
+// 初始化按钮状态
+if (!ttsEnabled) { ttsToggle.classList.remove('tts-on'); ttsToggle.title = '语音播报已关闭'; }
 
 ttsToggle.addEventListener('click', () => {
     ttsEnabled = !ttsEnabled;
+    localStorage.setItem('lingxi_tts', ttsEnabled ? '1' : '0');
     if (!ttsEnabled) {
         if (currentAudio) { currentAudio.pause(); currentAudio = null; }
         ttsToggle.classList.remove('tts-on');
@@ -2236,7 +2419,7 @@ function enterReceiptMode() {
 
     document.getElementById('receiptGenerate').addEventListener('click', () => {
         if (receiptSelected.length === 0) return;
-        generateReceipt(receiptSelected);
+        generateChatReceipt(receiptSelected);
         trackEvent('receipt_generated', { count: receiptSelected.length });
         exitReceiptMode();
     });
@@ -2255,7 +2438,8 @@ function exitReceiptMode() {
     document.getElementById('receiptBtn').textContent = '小票';
 }
 
-function generateReceipt(msgEls) {
+function generateReceipt(msgEls) { generateChatReceipt(msgEls); }  // 兼容旧调用
+function _legacyReceiptUnused(msgEls) {
     const SCALE = 2, W = 360, PAD = 28, LINE = 22;
     const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
@@ -2403,7 +2587,7 @@ function generateReceipt(msgEls) {
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }, 'image/png');
-}
+}  // end _legacyReceiptUnused
 
 // ── Crisis support popup ─────────────────────────────────────────
 function showCrisisPopup() {
@@ -2620,6 +2804,7 @@ async function sendEnhanced() {
                     ...msgHistory.slice(-15),
                 ],
                 stream: true,
+                stream_options: { include_usage: true },
                 max_tokens: 1200,
             }),
         });
@@ -2643,6 +2828,8 @@ async function sendEnhanced() {
                 if (data === '[DONE]') break outer;
                 try {
                     const j = JSON.parse(data);
+                    // 捕获 usage（最后一条 chunk 携带）
+                    if (j?.usage) lastApiUsage = j.usage;
                     // Guard: skip malformed chunks (streaming uses delta, not message)
                     if (!j?.choices?.length) continue;
                     const delta = j.choices[0]?.delta?.content || '';  // ④ optional chaining
@@ -2751,6 +2938,716 @@ async function sendEnhanced() {
         chatInput.focus();
     }
 }
+
+// ══════════════════════════════════════════════════
+//  愿望瓶 (Wish Bottle) — wish decomposition feature
+// ══════════════════════════════════════════════════
+
+function saveWishBottleProgress() {
+    localStorage.setItem('lingxi_wish_bottle', JSON.stringify(wishBottleData));
+}
+function loadWishBottleProgress() {
+    try {
+        const raw = localStorage.getItem('lingxi_wish_bottle');
+        if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { wish: '', steps: [], phase: 'input', depth: '', dialogue: [] };
+}
+let wishBottleData = loadWishBottleProgress();
+// phase: 'input' | 'probing' | 'steps' | 'done'
+// depth: '' | 'short' | 'long'
+// dialogue: [{role:'ai'|'user', content}]  ── 探针对话记录
+
+async function callWishSplit(wish) {
+    const body = {
+        model: 'deepseek-chat',
+        stream: false,
+        max_tokens: 300,
+        messages: [
+            {
+                role: 'system',
+                content: '你是一个愿望拆解助手。将用户的模糊愿望拆解为3个具体、微小、可执行的步骤，每个步骤耗时不超过5分钟。优先选择"信息收集"、"观察"、"书写"类动作，避免需要意志力的行为。只输出JSON，格式：{"steps":["步骤1","步骤2","步骤3"]}，不要其他文字。'
+            },
+            { role: 'user', content: wish }
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    const text = data?.choices?.[0]?.message?.content?.trim() || '{}';
+    try {
+        // Strip possible markdown code fences
+        const clean = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        return Array.isArray(parsed.steps) ? parsed.steps : [];
+    } catch {
+        return [];
+    }
+}
+
+// ── 探针：问一个问题 或 判断深度并输出步骤 ──
+async function callWishProbe(wish, dialogue) {
+    // dialogue: [{role:'ai'|'user', content}]
+    const history = dialogue.map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.content
+    }));
+    const body = {
+        model: 'deepseek-chat', stream: false, max_tokens: 300,
+        messages: [
+            {
+                role: 'system',
+                content: `你是灵犀，一个温柔、直觉敏锐的陪伴助手。用户说出了一个愿望。
+你的任务：先提一个探针问题，帮助判断这个愿望的本质——是「短期释放」（需要发泄、放松、暂时逃离），还是「长期目标」（想改变某件事、积累某种能力、成为某种人）。
+最多问1-2个问题。一旦你判断出深度，就停止提问，直接给出拆解结果。
+
+输出格式只能是以下两种之一，不加任何其他文字：
+
+如果还需要提问：
+{"type":"question","content":"你想问的一句话（不超过30字，不用"为什么"开头，用具体意象或感受描述）"}
+
+如果已能判断，输出步骤：
+{"type":"steps","depth":"short"或"long","label":"一句概括（10字内）","steps":["步骤1","步骤2","步骤3"]}
+
+short类型的步骤：感官型、立即见效、耗时≤5分钟，帮用户「此刻」感觉好一点。
+long类型的步骤：信息收集型、书写型、微小行动型，是长期改变的第一块砖。`
+            },
+            { role: 'user', content: `我的愿望：${wish}` },
+            ...history,
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    const text = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    try {
+        return JSON.parse(text);
+    } catch {
+        // 解析失败则直接走拆解
+        return { type: 'steps', depth: 'long', label: '', steps: [] };
+    }
+}
+
+// ── 反思：三步完成后的回应 ──
+async function callWishReflect(wish, depth, dialogue) {
+    const body = {
+        model: 'deepseek-chat', stream: false, max_tokens: 120,
+        messages: [
+            {
+                role: 'system',
+                content: '你是灵犀。用户刚完成了愿望瓶里的三个小步骤。用一到两句话回应——不评价成就感，不给建议，只是说出你观察到的一个细节，或者轻轻问一个此刻的感受。不超过50字。'
+            },
+            { role: 'user', content: `愿望：${wish}\n类型：${depth === 'short' ? '短期释放' : '长期目标'}\n之前的对话：${dialogue.map(m=>`${m.role==='ai'?'灵犀':'你'}：${m.content}`).join('\n')}` }
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    return data?.choices?.[0]?.message?.content?.trim() || '';
+}
+
+async function callWishReplace(wish, failedStep) {
+    const body = {
+        model: 'deepseek-chat',
+        stream: false,
+        max_tokens: 150,
+        messages: [
+            {
+                role: 'system',
+                content: '你是一个愿望拆解助手。用户完成不了某个步骤，请给出一个更小、更容易的替代步骤（耗时不超过3分钟，优先选择"写下来"、"搜一下"、"观察"类动作）。只输出一句话，不加序号，不加解释。'
+            },
+            {
+                role: 'user',
+                content: `愿望：${wish}\n完成不了的步骤：${failedStep}\n请给出一个更简单的替代步骤。`
+            }
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    return data?.choices?.[0]?.message?.content?.trim() || '';
+}
+
+// ── 渲染探针对话 ──
+function renderProbeMessages() {
+    const box = document.getElementById('wbProbeMessages');
+    box.innerHTML = '';
+    (wishBottleData.dialogue || []).forEach(m => {
+        const el = document.createElement('div');
+        el.className = `wb-probe-msg ${m.role}`;
+        el.textContent = m.content;
+        box.appendChild(el);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+
+function addProbeMsg(role, content) {
+    if (!wishBottleData.dialogue) wishBottleData.dialogue = [];
+    wishBottleData.dialogue.push({ role, content });
+    renderProbeMessages();
+}
+
+// ── 进入探针阶段 ──
+function enterProbePhase() {
+    document.getElementById('wbInputArea').style.display = 'none';
+    document.getElementById('wbProbeArea').style.display = '';
+    document.getElementById('wbStepsArea').style.display = 'none';
+    renderProbeMessages();
+}
+
+// ── 进入步骤阶段 ──
+function enterStepsPhase() {
+    document.getElementById('wbProbeArea').style.display = 'none';
+    document.getElementById('wbStepsArea').style.display = '';
+    // 深度标签
+    const tagEl = document.getElementById('wbDepthTag');
+    if (tagEl) {
+        const isShort = wishBottleData.depth === 'short';
+        tagEl.innerHTML = wishBottleData.depthLabel
+            ? `<span class="wb-depth-tag ${isShort ? 'wb-depth-short' : 'wb-depth-long'}">${isShort ? '一次释放' : '长期目标'} · ${wishBottleData.depthLabel}</span>`
+            : '';
+    }
+    renderWishBottleSteps();
+}
+
+function renderWishBottleSteps() {
+    const list = document.getElementById('wbStepsList');
+    const label = document.getElementById('wbWishLabel');
+    if (label) label.textContent = `"${wishBottleData.wish}"`;
+    list.innerHTML = '';
+
+    wishBottleData.steps.forEach((step, i) => {
+        const li = document.createElement('div');
+        li.className = 'wb-step';
+        if (step.status === 'done') li.classList.add('wb-done');
+
+        const num = document.createElement('span');
+        num.className = 'wb-step-num';
+        num.textContent = i + 1;
+
+        const txt = document.createElement('span');
+        txt.className = 'wb-step-text';
+        txt.textContent = step.text;
+
+        li.appendChild(num);
+        li.appendChild(txt);
+
+        if (step.status === 'pending') {
+            const btns = document.createElement('div');
+            btns.className = 'wb-step-btns';
+
+            const doneBtn = document.createElement('button');
+            doneBtn.className = 'wb-btn wb-btn-done';
+            doneBtn.textContent = '✅ 完成了';
+            doneBtn.addEventListener('click', () => {
+                const stepText = step.text;
+                wishBottleData.steps[i].status = 'done';
+                saveWishBottleProgress();
+                renderWishBottleSteps();
+                // 生成愿望小票
+                setTimeout(() => generateWishReceipt(stepText), 400);
+                if (wishBottleData.steps.every(s => s.status === 'done')) {
+                    setTimeout(() => showWishBottleCongrats(), 300);
+                }
+            });
+
+            const failBtn = document.createElement('button');
+            failBtn.className = 'wb-btn wb-btn-fail';
+            failBtn.textContent = '✗ 做不到';
+            failBtn.addEventListener('click', async () => {
+                failBtn.disabled = true;
+                failBtn.textContent = '换一个…';
+                const replacement = await callWishReplace(wishBottleData.wish, step.text);
+                if (replacement) {
+                    wishBottleData.steps[i] = { text: replacement, status: 'pending' };
+                } else {
+                    wishBottleData.steps[i].status = 'failed';
+                }
+                saveWishBottleProgress();
+                renderWishBottleSteps();
+            });
+
+            btns.appendChild(doneBtn);
+            btns.appendChild(failBtn);
+            li.appendChild(btns);
+        } else if (step.status === 'done') {
+            const badge = document.createElement('span');
+            badge.className = 'wb-status';
+            badge.textContent = '✦';
+            li.appendChild(badge);
+        }
+
+        list.appendChild(li);
+    });
+}
+
+async function showWishBottleCongrats() {
+    wishBottleData.phase = 'done';
+    saveWishBottleProgress();
+
+    const list = document.getElementById('wbStepsList');
+    const msg = document.createElement('div');
+    msg.style.cssText = 'text-align:center;padding:24px 0 8px;color:rgba(196,149,106,0.9);font-size:0.95rem;letter-spacing:0.08em;';
+    msg.textContent = '✦  三步都走完了。';
+    list.appendChild(msg);
+
+    // 灵犀反思回应
+    const reflectEl = document.getElementById('wbReflectArea');
+    if (reflectEl) {
+        reflectEl.style.display = '';
+        reflectEl.textContent = '…';
+        try {
+            const reflection = await callWishReflect(
+                wishBottleData.wish,
+                wishBottleData.depth,
+                wishBottleData.dialogue || []
+            );
+            reflectEl.textContent = reflection;
+        } catch {
+            reflectEl.style.display = 'none';
+        }
+    }
+}
+
+function openWishBottle() {
+    document.getElementById('wishBottlePanel').classList.add('open');
+    const phase = wishBottleData.phase || 'input';
+    if (phase === 'probing') {
+        enterProbePhase();
+    } else if (phase === 'steps' || phase === 'done') {
+        enterStepsPhase();
+        if (phase === 'done') {
+            // 已完成：不再显示反思加载，直接显示清空
+        }
+    } else {
+        document.getElementById('wbInputArea').style.display = '';
+        document.getElementById('wbProbeArea').style.display = 'none';
+        document.getElementById('wbStepsArea').style.display = 'none';
+        document.getElementById('wishBottleText').value = '';
+    }
+}
+
+function closeWishBottle() {
+    document.getElementById('wishBottlePanel').classList.remove('open');
+}
+
+// ── Event listeners ──
+document.getElementById('openWishBottleHero').addEventListener('click', openWishBottle);
+document.getElementById('openWishBottleChat').addEventListener('click', openWishBottle);
+document.getElementById('wishBottleClose').addEventListener('click', closeWishBottle);
+
+// ── 提交愿望：进入探针阶段 ──
+document.getElementById('wishBottleSubmit').addEventListener('click', async () => {
+    const ta = document.getElementById('wishBottleText');
+    const wish = ta.value.trim();
+    if (!wish) return;
+
+    const btn = document.getElementById('wishBottleSubmit');
+    btn.disabled = true;
+    btn.textContent = '思考中…';
+
+    try {
+        wishBottleData = { wish, steps: [], phase: 'probing', depth: '', dialogue: [], depthLabel: '' };
+        dbWishSave(wish);
+        saveWishBottleProgress();
+        enterProbePhase();
+
+        // 第一轮探针
+        const result = await callWishProbe(wish, []);
+        await handleProbeResult(result);
+    } catch (e) {
+        console.error('[WishBottle]', e);
+        btn.disabled = false;
+        btn.textContent = '放入愿望';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '放入愿望';
+    }
+});
+
+// ── 处理探针返回结果 ──
+async function handleProbeResult(result) {
+    if (!result) return;
+    if (result.type === 'question') {
+        addProbeMsg('ai', result.content);
+        saveWishBottleProgress();
+        // 等用户回答（由 wbProbeSend 处理）
+    } else if (result.type === 'steps') {
+        // 拿到深度和步骤，直接进入步骤阶段
+        const steps = result.steps || [];
+        if (!steps.length) return;
+        wishBottleData.steps = steps.map(text => ({ text, status: 'pending' }));
+        wishBottleData.depth = result.depth || 'long';
+        wishBottleData.depthLabel = result.label || '';
+        wishBottleData.phase = 'steps';
+        saveWishBottleProgress();
+        enterStepsPhase();
+    }
+}
+
+// ── 探针输入发送 ──
+async function sendProbeReply() {
+    const input = document.getElementById('wbProbeInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const sendBtn = document.getElementById('wbProbeSend');
+    sendBtn.disabled = true;
+    input.value = '';
+
+    addProbeMsg('user', text);
+    saveWishBottleProgress();
+
+    // 如果已经问了2轮，强制出步骤
+    const rounds = (wishBottleData.dialogue || []).filter(m => m.role === 'ai').length;
+    try {
+        if (rounds >= 2) {
+            // 强制拆解，不再追问
+            const steps = await callWishSplit(wishBottleData.wish);
+            await handleProbeResult({ type: 'steps', depth: 'long', label: '', steps });
+        } else {
+            const result = await callWishProbe(wishBottleData.wish, wishBottleData.dialogue);
+            await handleProbeResult(result);
+        }
+    } catch (e) {
+        console.error('[WishBottle probe]', e);
+    } finally {
+        sendBtn.disabled = false;
+    }
+}
+
+document.getElementById('wbProbeSend').addEventListener('click', sendProbeReply);
+document.getElementById('wbProbeInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendProbeReply(); }
+});
+
+document.getElementById('wishBottleClear').addEventListener('click', () => {
+    wishBottleData = { wish: '', steps: [], phase: 'input', depth: '', dialogue: [], depthLabel: '' };
+    localStorage.removeItem('lingxi_wish_bottle');
+    document.getElementById('wishBottleText').value = '';
+    document.getElementById('wbProbeArea').style.display = 'none';
+    document.getElementById('wbStepsArea').style.display = 'none';
+    document.getElementById('wbInputArea').style.display = '';
+});
+
+// ══════════════════════════════════════════════════
+//  小票系统 — 三种收据：对话 / 调用 / 愿望瓶
+// ══════════════════════════════════════════════════
+
+// ── 状态 ──
+let lastApiUsage = null;   // { prompt_tokens, completion_tokens, total_tokens }
+
+// ── CSS class 同步到 apiReceiptBtn ──
+const apiReceiptBtn = document.getElementById('apiReceiptBtn');
+if (apiReceiptBtn) {
+    // 与其他 header 按钮共享同一 CSS 选择器，已在 CSS 里声明
+}
+
+// ── 预览弹窗 ──
+(function buildReceiptPreviewDOM() {
+    const overlay = document.createElement('div');
+    overlay.id = 'receiptPreviewOverlay';
+    overlay.innerHTML = `
+        <div id="receiptPreviewBox">
+            <img id="receiptPreviewImg" src="" alt="小票预览">
+            <div class="receipt-preview-btns">
+                <button id="receiptSaveBtn">保存图片</button>
+                <button id="receiptCloseBtn">关闭</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById('receiptCloseBtn').addEventListener('click', () => {
+        overlay.classList.remove('open');
+    });
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+})();
+
+let _receiptBlobUrl = null;
+function showReceiptPreview(canvas, filename) {
+    canvas.toBlob(blob => {
+        if (_receiptBlobUrl) URL.revokeObjectURL(_receiptBlobUrl);
+        _receiptBlobUrl = URL.createObjectURL(blob);
+        document.getElementById('receiptPreviewImg').src = _receiptBlobUrl;
+        const saveBtn = document.getElementById('receiptSaveBtn');
+        saveBtn.onclick = () => {
+            const a = document.createElement('a');
+            a.href = _receiptBlobUrl;
+            a.download = filename;
+            a.click();
+        };
+        document.getElementById('receiptPreviewOverlay').classList.add('open');
+    }, 'image/png');
+}
+
+// ── 公共绘制工具 ──
+const RECEIPT_W = 360, RECEIPT_SCALE = 2, RECEIPT_PAD = 24;
+
+function makeReceiptCanvas(sections) {
+    // sections: array of { type, ...props }
+    // types: 'title', 'subtitle', 'divider', 'row', 'indent', 'footer', 'spacer'
+    const S = RECEIPT_SCALE, W = RECEIPT_W * S, PAD = RECEIPT_PAD * S;
+    const cvs = document.createElement('canvas');
+    cvs.width = W;
+    const ctx = cvs.getContext('2d');
+
+    // ── 预先测高 ──
+    function lineH(size) { return Math.round(size * S * 1.55); }
+    let totalH = 28 * S; // top teeth
+    sections.forEach(sec => {
+        if (sec.type === 'title')    totalH += lineH(16) + 4 * S;
+        else if (sec.type === 'subtitle') totalH += lineH(9);
+        else if (sec.type === 'divider')  totalH += 18 * S;
+        else if (sec.type === 'row')      totalH += lineH(10);
+        else if (sec.type === 'indent')   totalH += lineH(9.5);
+        else if (sec.type === 'footer')   totalH += lineH(9) + 4 * S;
+        else if (sec.type === 'spacer')   totalH += (sec.h || 8) * S;
+    });
+    totalH += 36 * S; // bottom teeth + padding
+
+    cvs.height = totalH;
+
+    // ── 背景 ──
+    ctx.fillStyle = '#f7f4ef';
+    ctx.fillRect(0, 0, W, totalH);
+
+    // ── 锯齿撕边（顶部）──
+    const teeth = 14, tw = W / teeth;
+    ctx.fillStyle = '#f7f4ef';
+    ctx.beginPath();
+    ctx.moveTo(0, -4);
+    for (let i = 0; i <= teeth; i++) ctx.lineTo(i * tw, i % 2 === 0 ? 0 : 13 * S);
+    ctx.lineTo(W, -4); ctx.closePath(); ctx.fill();
+
+    let y = 28 * S;
+
+    function dash(yy) {
+        ctx.save();
+        ctx.setLineDash([4 * S, 5 * S]);
+        ctx.strokeStyle = 'rgba(80,50,20,0.18)';
+        ctx.lineWidth = S;
+        ctx.beginPath();
+        ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy);
+        ctx.stroke(); ctx.restore();
+    }
+
+    sections.forEach(sec => {
+        ctx.textBaseline = 'alphabetic';
+        if (sec.type === 'title') {
+            ctx.font = `400 ${16 * S}px 'Noto Serif SC', serif`;
+            ctx.fillStyle = '#1a0e06';
+            ctx.textAlign = 'center';
+            ctx.fillText(sec.text, W / 2, y + 16 * S); y += lineH(16) + 4 * S;
+
+        } else if (sec.type === 'subtitle') {
+            ctx.font = `400 ${9 * S}px 'SF Mono', 'Courier New', monospace`;
+            ctx.fillStyle = '#7a5c3e';
+            ctx.textAlign = 'center';
+            ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9);
+
+        } else if (sec.type === 'divider') {
+            dash(y + 8 * S); y += 18 * S;
+
+        } else if (sec.type === 'row') {
+            const fs = sec.bold ? 10.5 : 10;
+            ctx.font = `${sec.bold ? '500' : '400'} ${fs * S}px 'SF Mono', 'Courier New', monospace`;
+            ctx.fillStyle = sec.dim ? '#a08060' : '#2a1608';
+            // key left
+            ctx.textAlign = 'left';
+            ctx.fillText(sec.key, PAD, y + fs * S);
+            // val right
+            ctx.textAlign = 'right';
+            ctx.fillText(sec.val, W - PAD, y + fs * S);
+            // dots fill
+            const keyW = ctx.measureText(sec.key).width;
+            const valW = ctx.measureText(sec.val).width;
+            const dotsArea = W - PAD * 2 - keyW - valW - 8 * S;
+            if (dotsArea > 0) {
+                ctx.fillStyle = 'rgba(80,50,20,0.22)';
+                const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
+                ctx.font = `400 ${8 * S}px 'SF Mono', monospace`;
+                ctx.textAlign = 'left';
+                // clip dots to available space
+                let dots = '';
+                for (const c of dotStr) {
+                    if (ctx.measureText(dots + c).width > dotsArea) break;
+                    dots += c;
+                }
+                ctx.fillText(dots, PAD + keyW + 4 * S, y + fs * S);
+            }
+            y += lineH(fs);
+
+        } else if (sec.type === 'indent') {
+            ctx.font = `400 ${9.5 * S}px 'SF Mono', 'Courier New', monospace`;
+            ctx.fillStyle = '#5a3c22';
+            ctx.textAlign = 'left';
+            ctx.fillText(sec.text, PAD + 12 * S, y + 9.5 * S); y += lineH(9.5);
+
+        } else if (sec.type === 'footer') {
+            ctx.font = `400 ${9 * S}px 'Noto Serif SC', serif`;
+            ctx.fillStyle = '#9a7050';
+            ctx.textAlign = 'center';
+            ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9) + 4 * S;
+
+        } else if (sec.type === 'spacer') {
+            y += (sec.h || 8) * S;
+        }
+    });
+
+    // ── 锯齿撕边（底部）──
+    ctx.fillStyle = '#f7f4ef';
+    ctx.beginPath();
+    ctx.moveTo(0, totalH + 4);
+    for (let i = 0; i <= teeth; i++) ctx.lineTo(i * tw, totalH - (i % 2 === 0 ? 0 : 13 * S));
+    ctx.lineTo(W, totalH + 4); ctx.closePath(); ctx.fill();
+
+    return cvs;
+}
+
+function receiptNo(prefix) {
+    const d = new Date();
+    const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    return `${prefix}-${ymd}-${Math.floor(Math.random()*9000+1000)}`;
+}
+function nowStr() {
+    return new Date().toLocaleString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+// ════════════════════════════════
+//  1. 对话小票
+// ════════════════════════════════
+function generateChatReceipt(msgEls) {
+    const entries = msgEls.map(el => ({
+        isUser: el.classList.contains('msg-user'),
+        text: (el.innerText || el.textContent).replace(/🔊/g,'').replace(/\s+/g,' ').trim(),
+    }));
+    const userCount = entries.filter(e => e.isUser).length;
+    const aiCount   = entries.filter(e => !e.isUser).length;
+    const avgLen    = entries.reduce((s,e) => s + e.text.length, 0) / entries.length;
+    const depth     = avgLen > 80 ? '★★★★☆' : avgLen > 40 ? '★★★☆☆' : '★★☆☆☆';
+    const no        = receiptNo('CHAT');
+    const snippet   = entries[0].text.slice(0, 20) + (entries[0].text.length > 20 ? '…' : '');
+
+    const sections = [
+        { type: 'spacer', h: 4 },
+        { type: 'title',    text: '💬  对话小票' },
+        { type: 'subtitle', text: `单号：${no}` },
+        { type: 'subtitle', text: nowStr() },
+        { type: 'divider' },
+        { type: 'row', key: '消息总数', val: `${entries.length} 条` },
+        { type: 'row', key: '你说了', val: `${userCount} 条` },
+        { type: 'row', key: '灵犀说了', val: `${aiCount} 条` },
+        { type: 'divider' },
+        { type: 'row', key: '关键片段', val: '' },
+        ...entries.map(e => ({ type: 'indent', text: `${e.isUser ? '你' : '灵犀'}："${e.text.slice(0,22)}${e.text.length>22?'…':''}"` })),
+        { type: 'divider' },
+        { type: 'row', key: '深度指数', val: depth },
+        { type: 'spacer', h: 6 },
+        { type: 'footer', text: `"${snippet}"` },
+        { type: 'footer', text: '── 心镜 · 对话存档 ──' },
+    ];
+    const cvs = makeReceiptCanvas(sections);
+    showReceiptPreview(cvs, `chat-${Date.now()}.png`);
+}
+
+// ════════════════════════════════
+//  2. 调用小票
+// ════════════════════════════════
+function generateApiReceipt() {
+    const u = lastApiUsage;
+    const isDemo = !u;
+    const pt  = u?.prompt_tokens     ?? 1240;
+    const ct  = u?.completion_tokens ?? 380;
+    const tot = u?.total_tokens      ?? (pt + ct);
+    // DeepSeek-chat 价格 (USD/1M tokens)
+    const INPUT_PRICE  = 0.27;
+    const OUTPUT_PRICE = 1.10;
+    const cost = ((pt * INPUT_PRICE + ct * OUTPUT_PRICE) / 1_000_000).toFixed(5);
+    const no = receiptNo('API');
+
+    const sections = [
+        { type: 'spacer', h: 4 },
+        { type: 'title',    text: '🧾  调用小票' },
+        { type: 'subtitle', text: `单号：${no}` },
+        { type: 'subtitle', text: nowStr() },
+        { type: 'divider' },
+        { type: 'row', key: '服务商', val: 'DeepSeek' },
+        { type: 'row', key: '模型',   val: 'deepseek-chat' },
+        { type: 'divider' },
+        { type: 'row', key: '项目',        val: 'Tokens' },
+        { type: 'row', key: '输入 tokens', val: pt.toLocaleString() },
+        { type: 'row', key: '输出 tokens', val: ct.toLocaleString() },
+        { type: 'divider' },
+        { type: 'row', key: '合计 tokens', val: tot.toLocaleString(), bold: true },
+        { type: 'row', key: '费用估算 (USD)', val: `$${cost}`, bold: true },
+        { type: 'row', key: '计价日期', val: '2025-07', dim: true },
+        { type: 'divider' },
+        { type: 'spacer', h: 4 },
+        { type: 'footer', text: isDemo ? '※ 无最新调用记录，展示演示数据' : '此为快照，不含税费' },
+        { type: 'footer', text: '── 心镜 · 接口账单 ──' },
+    ];
+    const cvs = makeReceiptCanvas(sections);
+    showReceiptPreview(cvs, `api-${Date.now()}.png`);
+}
+
+// ════════════════════════════════
+//  3. 愿望瓶小票
+// ════════════════════════════════
+let completedStepsTotal = parseInt(localStorage.getItem('lingxi_completed_steps') || '0');
+
+function generateWishReceipt(stepText) {
+    completedStepsTotal++;
+    localStorage.setItem('lingxi_completed_steps', String(completedStepsTotal));
+    const no = receiptNo('WISH');
+    const encouragements = [
+        '一小步，也是向前。', '做到了，就是做到了。', '迈出来的，就不会消失。',
+        '你比你以为的更有力量。', '每一步都算数。',
+    ];
+    const enc = encouragements[Math.floor(Math.random() * encouragements.length)];
+    const wishText = wishBottleData.wish || '（未命名愿望）';
+
+    const sections = [
+        { type: 'spacer', h: 4 },
+        { type: 'title',    text: '✦  愿望小票  ✦' },
+        { type: 'subtitle', text: `单号：${no}` },
+        { type: 'subtitle', text: nowStr() },
+        { type: 'divider' },
+        { type: 'row',    key: '愿望', val: '' },
+        { type: 'indent', text: wishText.slice(0, 28) + (wishText.length > 28 ? '…' : '') },
+        { type: 'spacer', h: 4 },
+        { type: 'row',    key: '完成步骤', val: '' },
+        { type: 'indent', text: stepText.slice(0, 30) + (stepText.length > 30 ? '…' : '') },
+        { type: 'divider' },
+        { type: 'row', key: '完成时间', val: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }) },
+        { type: 'row', key: '累计完成步骤', val: `${completedStepsTotal} 个`, bold: true },
+        { type: 'divider' },
+        { type: 'spacer', h: 4 },
+        { type: 'footer', text: `"${enc}"` },
+        { type: 'footer', text: '── 心镜 · 愿望存档 ──' },
+    ];
+    const cvs = makeReceiptCanvas(sections);
+    showReceiptPreview(cvs, `wish-${Date.now()}.png`);
+}
+
+// ── 调用小票按钮 ──
+document.getElementById('apiReceiptBtn').addEventListener('click', generateApiReceipt);
+
+// ── 更新 CSS 选择器以包含 apiReceiptBtn ──
+// （已在 HTML CSS 里 #clearMemory, #newSession, #receiptBtn, #historyBtn, #openWishBottleChat 统一声明，需补上）
 </script>
 </body>
 </html>
