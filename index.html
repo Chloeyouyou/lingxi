@@ -556,6 +556,43 @@
         .wb-step-note input::placeholder { color:rgba(255,255,255,0.18); }
         .wb-step-note input:focus { border-color:rgba(196,149,106,0.3); }
         /* done 视图底部按钮行 */
+        /* 教练对话区 */
+        #wbCoachingArea { display:none; }
+        #wbCoachMessages { max-height:340px; overflow-y:auto; padding:4px 0; margin-bottom:4px; }
+        .wb-coach-msg {
+            padding:10px 14px; margin-bottom:10px; border-radius:14px;
+            font-size:0.88rem; line-height:1.65;
+        }
+        .wb-coach-msg.ai { background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.75); }
+        .wb-coach-msg.user {
+            background:rgba(196,149,106,0.1); color:rgba(255,220,160,0.85);
+            text-align:right; margin-left:20%;
+        }
+        #wbCoachInputRow { display:flex; gap:8px; margin-top:10px; align-items:flex-end; }
+        #wbCoachInput {
+            flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+            border-radius:12px; padding:10px 14px; font-family:inherit; font-size:0.85rem;
+            color:rgba(255,255,255,0.7); outline:none; resize:none; transition:border-color 0.2s;
+            line-height:1.5;
+        }
+        #wbCoachInput:focus { border-color:rgba(196,149,106,0.35); }
+        #wbCoachInput::placeholder { color:rgba(255,255,255,0.2); }
+        #wbCoachSend {
+            flex-shrink:0; width:36px; height:36px; border-radius:50%; font-size:1rem;
+            background:rgba(196,149,106,0.2); border:1px solid rgba(196,149,106,0.35);
+            color:rgba(255,220,160,0.8); cursor:pointer; transition:background 0.2s;
+        }
+        #wbCoachSend:hover { background:rgba(196,149,106,0.32); }
+        #wbCoachSend:disabled { opacity:0.3; pointer-events:none; }
+        #wbCoachReady { display:none; }
+        #wbCoachReadyBtn {
+            width:100%; margin-top:16px; padding:13px;
+            background:rgba(196,149,106,0.14); border:1px solid rgba(196,149,106,0.35);
+            color:rgba(255,220,160,0.85); border-radius:14px; font-family:inherit;
+            font-size:0.88rem; letter-spacing:0.08em; cursor:pointer; transition:background 0.2s;
+        }
+        #wbCoachReadyBtn:hover { background:rgba(196,149,106,0.26); }
+        #wbCoachReadyBtn:disabled { opacity:0.35; pointer-events:none; }
         .wb-done-actions {
             display:flex; gap:10px; margin-top:22px; flex-wrap:wrap;
         }
@@ -808,6 +845,17 @@
             <textarea id="wishBottleText" placeholder="写下你的愿望，可以很模糊、很大、很不切实际"></textarea>
             <br>
             <button id="wishBottleSubmit">放入愿望</button>
+        </div>
+        <div id="wbCoachingArea" style="display:none">
+            <div class="wb-wish-title" id="wbCoachWishLabel"></div>
+            <div id="wbCoachMessages"></div>
+            <div id="wbCoachReady">
+                <button id="wbCoachReadyBtn">开始拆解 →</button>
+            </div>
+            <div id="wbCoachInputRow">
+                <textarea id="wbCoachInput" placeholder="回复…" rows="2"></textarea>
+                <button id="wbCoachSend">↑</button>
+            </div>
         </div>
         <div id="wbDirectionsArea" style="display:none">
             <div class="wb-wish-title" id="wbDirWishLabel"></div>
@@ -1073,6 +1121,22 @@ const SOCRATIC_PROMPT = `你是一个直接的对话伙伴。不绕弯，不用�
 
 回复末尾加 [STRESS:X]，X 是 0-10 整数。
 如果判断用户处于严重情绪危机，加 [CRISIS]。`;
+
+const COACH_PROMPT = `你是一位专业的目标顾问。用户带来了一个愿望，你的工作是通过对话帮他们搞清楚这个愿望背后真正想要的是什么。
+
+风格：专业、直接。像高质量的执行力教练，不绕弯，不说废话。不是心理咨询，不是情绪陪伴。专注在目标的清晰度上。
+
+每轮只问一个问题，按顺序追问：
+第一轮问动机："这个愿望背后，你最核心的驱动力是什么？"
+第二轮问约束："目前最大的卡点是什么？不是借口，是真实的障碍。"
+第三轮问成功定义："如果这个愿望实现了，半年后你的日常是什么样的？"
+
+听完回答，尝试命名你听到的核心——用一句话说出来，然后问："是这样吗？"
+如果用户说不对，重新理解，不坚持。
+
+当你觉得已经理解了用户真正的需求（通常2-3轮后），在回复正文末尾单独一行加：
+[READY: 一句话总结用户核心意图，≤20字]
+不要过早加，先让对话有深度。加了 [READY] 之后正文说："好，我现在理解你想要的了。我们来把它拆开。"`;
 
 const WB_PROMPT = `你是用户的引导性朋友，帮他们把愿望变成真实的行动。
 
@@ -3239,6 +3303,8 @@ function loadWishBottleProgress() {
             if (!d.chosenDirection) d.chosenDirection = '';
             if (!d.scope) d.scope = null;
             if (!d.startedAt) d.startedAt = Date.now();
+            if (!d.coachingHistory) d.coachingHistory = [];
+            if (!d.coachingSummary) d.coachingSummary = '';
             // 迁移旧 phase
             if (d.phase === 'validating' || d.phase === 'steps') d.phase = 'active';
             if (d.phase === 'probing') d.phase = 'directions';
@@ -3247,10 +3313,10 @@ function loadWishBottleProgress() {
             return d;
         }
     } catch (_) {}
-    return { wish: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
+    return { wish: '', coachingHistory: [], coachingSummary: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
 }
 let wishBottleData = loadWishBottleProgress();
-// phase: 'input' | 'directions' | 'scoping' | 'active' | 'done'
+// phase: 'input' | 'coaching' | 'directions' | 'scoping' | 'active' | 'done'
 
 // ── 方向选择：给出3个角度 ──
 async function callWishDirections(wish) {
@@ -3277,6 +3343,118 @@ ${userSummary ? '用户近期画像：' + userSummary : ''}
         return Array.isArray(parsed.directions) ? parsed.directions : [];
     } catch { return []; }
 }
+
+// ══════════════════════════════════════════════════
+//  愿望瓶 教练对话阶段
+// ══════════════════════════════════════════════════
+
+async function callWishCoach(wish, history) {
+    const msgs = history.map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.content
+    }));
+    const body = {
+        model: 'deepseek-chat', stream: false, max_tokens: 250,
+        messages: [
+            { role: 'system', content: COACH_PROMPT },
+            ...(userSummary ? [{ role: 'system', content: `用户画像：${userSummary}` }] : []),
+            { role: 'user', content: `我的愿望：${wish}` },
+            ...msgs,
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    let raw = (data?.choices?.[0]?.message?.content || '').trim();
+    const readyMatch = raw.match(/\[READY[:\s]*(.+?)\]/);
+    const summary = readyMatch ? readyMatch[1].trim() : null;
+    const reply = raw.replace(/\[READY[^\]]*\]/g, '').trim();
+    return { reply, summary };
+}
+
+function appendCoachMsg(role, content) {
+    const box = document.getElementById('wbCoachMessages');
+    const el = document.createElement('div');
+    el.className = `wb-coach-msg ${role}`;
+    el.textContent = content;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+}
+
+function enterCoachingPhase() {
+    document.getElementById('wbInputArea').style.display = 'none';
+    document.getElementById('wbCoachingArea').style.display = 'block';
+    document.getElementById('wbDirectionsArea').style.display = 'none';
+    document.getElementById('wbScopeArea').style.display = 'none';
+    document.getElementById('wbStepsArea').style.display = 'none';
+    const label = document.getElementById('wbCoachWishLabel');
+    if (label) label.textContent = `"${wishBottleData.wish}"`;
+    const box = document.getElementById('wbCoachMessages');
+    box.innerHTML = '';
+    (wishBottleData.coachingHistory || []).forEach(m => appendCoachMsg(m.role, m.content));
+    if (wishBottleData.coachingSummary) {
+        document.getElementById('wbCoachReady').style.display = 'block';
+        document.getElementById('wbCoachInputRow').style.display = 'none';
+    } else {
+        document.getElementById('wbCoachReady').style.display = 'none';
+        document.getElementById('wbCoachInputRow').style.display = 'flex';
+    }
+}
+
+async function sendWbCoach() {
+    const input = document.getElementById('wbCoachInput');
+    const text = input.value.trim();
+    if (!text) return;
+    const sendBtn = document.getElementById('wbCoachSend');
+    sendBtn.disabled = true;
+    input.value = '';
+    appendCoachMsg('user', text);
+    wishBottleData.coachingHistory.push({ role: 'user', content: text });
+    saveWishBottleProgress();
+    try {
+        const { reply, summary } = await callWishCoach(wishBottleData.wish, wishBottleData.coachingHistory);
+        if (reply) {
+            appendCoachMsg('ai', reply);
+            wishBottleData.coachingHistory.push({ role: 'ai', content: reply });
+        }
+        if (summary) {
+            wishBottleData.coachingSummary = summary;
+            wishBottleData.chosenDirection = summary;
+            document.getElementById('wbCoachReady').style.display = 'block';
+            document.getElementById('wbCoachInputRow').style.display = 'none';
+        }
+        saveWishBottleProgress();
+    } catch (e) {
+        console.error('[WbCoach]', e);
+    } finally {
+        sendBtn.disabled = false;
+    }
+}
+
+document.getElementById('wbCoachSend').addEventListener('click', sendWbCoach);
+document.getElementById('wbCoachInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWbCoach(); }
+});
+
+document.getElementById('wbCoachReadyBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('wbCoachReadyBtn');
+    btn.disabled = true;
+    btn.textContent = '分析中…';
+    try {
+        const summary = wishBottleData.coachingSummary || wishBottleData.wish;
+        const scope = await callWishScope(wishBottleData.wish, summary);
+        wishBottleData.scope = scope;
+        wishBottleData.depth = scope.depth || 'long';
+        wishBottleData.depthLabel = scope.depthLabel || '';
+        wishBottleData.phase = 'scoping';
+        saveWishBottleProgress();
+        enterScopingPhase();
+    } catch {
+        btn.disabled = false;
+        btn.textContent = '开始拆解 →';
+    }
+});
 
 // ── 大纲：根据愿望+方向生成大到小拆解 ──
 async function callWishScope(wish, direction) {
@@ -3929,7 +4107,9 @@ async function callWishReport() {
 function openWishBottle() {
     document.getElementById('wishBottlePanel').classList.add('open');
     const phase = wishBottleData.phase || 'input';
-    if (phase === 'directions') {
+    if (phase === 'coaching') {
+        enterCoachingPhase();
+    } else if (phase === 'directions') {
         enterDirectionsPhase();
     } else if (phase === 'scoping') {
         enterScopingPhase();
@@ -3964,21 +4144,28 @@ document.getElementById('wishBottleSubmit').addEventListener('click', async () =
     btn.textContent = '思考中…';
 
     try {
-        wishBottleData = { wish, steps: [], phase: 'directions', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now(), _directions: [] };
+        wishBottleData = { wish, coachingHistory: [], coachingSummary: '', steps: [], phase: 'coaching', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
         dbWishSave(wish);
         saveWishBottleProgress();
-        enterDirectionsPhase([]);  // 先显示空状态
+        enterCoachingPhase();
 
-        const directions = await callWishDirections(wish);
-        if (!directions.length) throw new Error('No directions returned');
-        wishBottleData._directions = directions;
-        saveWishBottleProgress();
-        renderDirections(directions);
+        const { reply, summary } = await callWishCoach(wish, []);
+        if (reply) {
+            appendCoachMsg('ai', reply);
+            wishBottleData.coachingHistory.push({ role: 'ai', content: reply });
+            saveWishBottleProgress();
+        }
+        if (summary) {
+            wishBottleData.coachingSummary = summary;
+            wishBottleData.chosenDirection = summary;
+            document.getElementById('wbCoachReady').style.display = 'block';
+            document.getElementById('wbCoachInputRow').style.display = 'none';
+            saveWishBottleProgress();
+        }
     } catch (e) {
         console.error('[WishBottle]', e);
-        // 回退到输入界面
         document.getElementById('wbInputArea').style.display = '';
-        document.getElementById('wbDirectionsArea').style.display = 'none';
+        document.getElementById('wbCoachingArea').style.display = 'none';
     } finally {
         btn.disabled = false;
         btn.textContent = '放入愿望';
@@ -4006,9 +4193,13 @@ document.getElementById('wbScopeStartBtn').addEventListener('click', async () =>
 });
 
 document.getElementById('wishBottleClear').addEventListener('click', () => {
-    wishBottleData = { wish: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
+    wishBottleData = { wish: '', coachingHistory: [], coachingSummary: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
     localStorage.removeItem('lingxi_wish_bottle');
     document.getElementById('wishBottleText').value = '';
+    document.getElementById('wbCoachingArea').style.display = 'none';
+    document.getElementById('wbCoachMessages').innerHTML = '';
+    document.getElementById('wbCoachReady').style.display = 'none';
+    document.getElementById('wbCoachInputRow').style.display = 'flex';
     document.getElementById('wbDirectionsArea').style.display = 'none';
     document.getElementById('wbScopeArea').style.display = 'none';
     document.getElementById('wbStepsArea').style.display = 'none';
