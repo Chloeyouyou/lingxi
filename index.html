@@ -3986,7 +3986,7 @@ async function callWishChat(userMsg) {
         ? pendingSteps.map(s => `步骤${s.num}（${s.locked ? '执行中/已锁定' : '候选/未锁定'}）：${s.text}`).join('\n')
         : '（暂无待处理步骤）';
 
-    const basePrompt = socraticMode ? SOCRATIC_PROMPT : SYSTEM_PROMPT;
+    const basePrompt = SOCRATIC_PROMPT;
 
     const wishContext = `
 ──── 愿望瓶上下文（仅供参考，不要主动提起，除非用户说到） ────
