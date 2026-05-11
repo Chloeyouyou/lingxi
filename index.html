@@ -3375,12 +3375,19 @@ async function callWishRefill(wish, depth, doneCount, excludeSteps = []) {
         messages: [
             {
                 role: 'system',
-                content: `你是一个愿望拆解助手。用户正在逐步实现愿望，已完成 ${doneCount} 步，请生成下一个候选步骤。
-要求：${depth === 'short' ? '感官型、立即见效、耗时≤5分钟' : '信息收集型、书写型或微小行动型，是长期改变的砖'}
+                content: `你是一个愿望拆解助手。根据用户的愿望和目标框架，生成一个具体的下一步行动。
+
+愿望："${wish}"
 ${wishBottleData.chosenDirection ? '用户选定的方向：' + wishBottleData.chosenDirection : ''}
+${scope?.goal ? '终极目标：' + scope.goal : ''}
+${scope?.milestone ? '近期里程碑：' + scope.milestone : ''}
 ${scope?.weeklyAction ? '本周行动方向：' + scope.weeklyAction : ''}
-必须避开的类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}
-${userSummary ? '用户近期画像：' + userSummary : ''}${excludeNote}
+已完成 ${doneCount} 步。
+${userSummary ? '\n用户画像（据此判断他/她的偏好和能力范围）：' + userSummary : ''}
+必须避开的行动类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}${excludeNote}
+
+要求：${depth === 'short' ? '感官型、立即见效、耗时≤5分钟' : '贴合本周方向、具体可操作、今天就能开始'}
+步骤要针对这个人的具体愿望，不要通用模板，不要"列清单"类的万能步骤。
 只输出一句话（≤20字），不加序号和解释，不加引号。`
             },
             { role: 'user', content: `愿望：${wish}` }
@@ -4006,10 +4013,16 @@ async function callWishChat(userMsg) {
 
     const basePrompt = WB_PROMPT;
 
+    const scope = wishBottleData.scope;
+    const scopeBlock = scope
+        ? `\n目标框架：${scope.goal || ''}${scope.milestone ? ' → 近期里程碑：' + scope.milestone : ''}${scope.weeklyAction ? '\n本周方向：' + scope.weeklyAction : ''}`
+        : '';
+    const dirBlock = wishBottleData.chosenDirection ? `\n用户选定的方向：${wishBottleData.chosenDirection}` : '';
+
     const wishContext = `
 ──── 愿望瓶上下文（仅供参考，不要主动提起，除非用户说到） ────
 用户正在通过愿望瓶处理一个愿望："${wishBottleData.wish}"
-类型：${wishBottleData.depth === 'short' ? '短期释放' : '长期目标'}
+类型：${wishBottleData.depth === 'short' ? '短期释放' : '长期目标'}${dirBlock}${scopeBlock}
 当前步骤：
 ${stepsSummary}
 
