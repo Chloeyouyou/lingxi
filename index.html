@@ -4000,11 +4000,18 @@ ${stepsSummary}
 例：[UPDATE:2:打开手机备忘录，写下脑子里最近的一件事]
 执行中/已锁定的步骤不能修改。如无需更新步骤，不加此标记。`;
 
+    // 带上历史（排除最后一条即刚 push 的 userMsg，避免重复）
+    const historyMsgs = (wishBottleData.chatHistory || [])
+        .slice(0, -1)
+        .slice(-20)
+        .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }));
+
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 300,
         messages: [
             { role: 'system', content: basePrompt + wishContext },
             ...(userSummary ? [{ role: 'system', content: `用户近期画像：${userSummary}` }] : []),
+            ...historyMsgs,
             { role: 'user', content: userMsg }
         ]
     };
