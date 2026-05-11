@@ -3462,13 +3462,16 @@ document.getElementById('wbCoachReadyBtn').addEventListener('click', async () =>
 
 // ── 大纲：根据愿望+方向生成大到小拆解 ──
 async function callWishScope(wish, direction) {
+    const coachContext = wishBottleData.coachingSummary
+        ? `\n用户通过深度对话确认的核心意图：「${wishBottleData.coachingSummary}」\ngoal/milestone/weeklyAction 必须紧扣这个具体意图，体现用户说出来的真实情况，不要用通用描述。`
+        : '';
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 250,
         messages: [
             {
                 role: 'system',
-                content: `用户有一个愿望，已选定方向。请判断这是「短期释放」还是「长期目标」，并生成对应的大纲。
-${userSummary ? '用户近期画像：' + userSummary : ''}
+                content: `用户有一个愿望，已通过深度对话确认了方向。请判断这是「短期释放」还是「长期目标」，并生成对应的大纲。
+${userSummary ? '用户近期画像：' + userSummary : ''}${coachContext}
 必须避开的行动类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}
 
 短期释放输出：{"depth":"short","depthLabel":"10字内概括","goal":"今天想达到的感受或结果（≤20字）"}
@@ -3581,6 +3584,7 @@ ${wishBottleData.chosenDirection ? '用户选定的方向：' + wishBottleData.c
 ${scope?.goal ? '终极目标：' + scope.goal : ''}
 ${scope?.milestone ? '近期里程碑：' + scope.milestone : ''}
 ${scope?.weeklyAction ? '本周行动方向：' + scope.weeklyAction : ''}
+${wishBottleData.coachingSummary ? '教练对话确认的核心意图（步骤必须紧扣这个）：' + wishBottleData.coachingSummary : ''}
 已完成 ${doneCount} 步。
 ${userSummary ? '\n用户画像（据此判断他/她的偏好和能力范围）：' + userSummary : ''}
 必须避开的行动类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}${excludeNote}
