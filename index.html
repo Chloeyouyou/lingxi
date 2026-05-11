@@ -510,6 +510,21 @@
         .wb-btn-fail { background: rgba(200,100,80,0.1); border-color: rgba(200,100,80,0.25); color: rgba(220,130,110,0.8); }
         .wb-btn-fail:hover { background: rgba(200,100,80,0.22); }
         .wb-btn:disabled { opacity: 0.35; pointer-events: none; }
+        /* ── 确认阶段 ── */
+        .wb-confirm-btn {
+            padding: 3px 10px; border-radius: 8px; font-size: 0.72rem; font-family: inherit;
+            border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.4);
+            background: transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+        }
+        .wb-confirm-btn:hover { border-color: rgba(196,149,106,0.4); color: rgba(255,220,160,0.7); }
+        .wb-confirm-btn:disabled { opacity: 0.3; pointer-events: none; }
+        #wbStartBtn {
+            margin-top: 22px; width: 100%; padding: 12px;
+            background: rgba(196,149,106,0.14); border: 1px solid rgba(196,149,106,0.35);
+            color: rgba(255,220,160,0.85); border-radius: 14px; font-size: 0.85rem;
+            font-family: inherit; letter-spacing: 0.08em; transition: background 0.2s; cursor: pointer;
+        }
+        #wbStartBtn:hover { background: rgba(196,149,106,0.26); }
         .wb-status { font-size: 0.72rem; color: rgba(255,255,255,0.25); padding-top: 4px; }
         /* ── 愿望瓶：探针对话区 ── */
         #wbProbeArea { display: none; margin-top: 4px; }
@@ -3013,7 +3028,7 @@ async function callWishSplit(wish) {
         messages: [
             {
                 role: 'system',
-                content: '你是一个愿望拆解助手。将用户的模糊愿望拆解为3个具体、微小、可执行的步骤，每个步骤耗时不超过5分钟。优先选择"信息收集"、"观察"、"书写"类动作，避免需要意志力的行为。只输出JSON，格式：{"steps":["步骤1","步骤2","步骤3"]}，不要其他文字。'
+                content: `你是一个愿望拆解助手。将用户的模糊愿望拆解为3个具体、微小、可执行的步骤，每个步骤耗时不超过5分钟。优先选择"信息收集"、"观察"、"书写"类动作，避免需要意志力的行为。只输出JSON，格式：{"steps":["步骤1","步骤2","步骤3"]}，不要其他文字。${userSummary ? '\n用户近期画像：' + userSummary : ''}`
             },
             { role: 'user', content: wish }
         ]
@@ -3060,7 +3075,8 @@ async function callWishProbe(wish, dialogue) {
 {"type":"steps","depth":"short"或"long","label":"一句概括（10字内）","steps":["步骤1","步骤2","步骤3"]}
 
 short类型的步骤：感官型、立即见效、耗时≤5分钟，帮用户「此刻」感觉好一点。
-long类型的步骤：信息收集型、书写型、微小行动型，是长期改变的第一块砖。`
+long类型的步骤：信息收集型、书写型、微小行动型，是长期改变的第一块砖。
+${userSummary ? '用户近期画像：' + userSummary : ''}`
             },
             { role: 'user', content: `我的愿望：${wish}` },
             ...history,
@@ -3169,6 +3185,81 @@ function enterStepsPhase() {
     renderWishBottleSteps();
 }
 
+// ── 确认阶段 ──
+function enterValidatingPhase() {
+    document.getElementById('wbProbeArea').style.display = 'none';
+    document.getElementById('wbStepsArea').style.display = 'block';
+    const tagEl = document.getElementById('wbDepthTag');
+    if (tagEl) {
+        const isShort = wishBottleData.depth === 'short';
+        tagEl.innerHTML = wishBottleData.depthLabel
+            ? `<span class="wb-depth-tag ${isShort ? 'wb-depth-short' : 'wb-depth-long'}">${isShort ? '一次释放' : '长期目标'} · ${wishBottleData.depthLabel}</span>`
+            : '';
+    }
+    renderValidatingSteps();
+}
+
+function renderValidatingSteps() {
+    const list = document.getElementById('wbStepsList');
+    const label = document.getElementById('wbWishLabel');
+    if (label) label.textContent = `"${wishBottleData.wish}"`;
+    list.innerHTML = '';
+
+    // 提示文字
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:0.78rem;color:rgba(255,255,255,0.3);margin-bottom:14px;letter-spacing:0.04em;';
+    hint.textContent = '这三步合适吗？不合适可以换。';
+    list.appendChild(hint);
+
+    wishBottleData.steps.forEach((step, i) => {
+        const row = document.createElement('div');
+        row.className = 'wb-step';
+
+        const num = document.createElement('span');
+        num.className = 'wb-step-num';
+        num.textContent = i + 1;
+
+        const txt = document.createElement('span');
+        txt.className = 'wb-step-text';
+        txt.textContent = step.text;
+
+        const swapBtn = document.createElement('button');
+        swapBtn.className = 'wb-confirm-btn';
+        swapBtn.textContent = '换一个';
+        swapBtn.addEventListener('click', async () => {
+            swapBtn.disabled = true;
+            swapBtn.textContent = '换中…';
+            try {
+                const replacement = await callWishReplace(wishBottleData.wish, step.text);
+                if (replacement) {
+                    wishBottleData.steps[i] = { text: replacement, status: 'pending' };
+                    saveWishBottleProgress();
+                    renderValidatingSteps();
+                }
+            } catch (e) {
+                swapBtn.disabled = false;
+                swapBtn.textContent = '换一个';
+            }
+        });
+
+        row.appendChild(num);
+        row.appendChild(txt);
+        row.appendChild(swapBtn);
+        list.appendChild(row);
+    });
+
+    // "就这三步，开始"按钮
+    const startBtn = document.createElement('button');
+    startBtn.id = 'wbStartBtn';
+    startBtn.textContent = '就这三步，开始 →';
+    startBtn.addEventListener('click', () => {
+        wishBottleData.phase = 'steps';
+        saveWishBottleProgress();
+        enterStepsPhase();
+    });
+    list.appendChild(startBtn);
+}
+
 function renderWishBottleSteps() {
     const list = document.getElementById('wbStepsList');
     const label = document.getElementById('wbWishLabel');
@@ -3273,11 +3364,10 @@ function openWishBottle() {
     const phase = wishBottleData.phase || 'input';
     if (phase === 'probing') {
         enterProbePhase();
+    } else if (phase === 'validating') {
+        enterValidatingPhase();
     } else if (phase === 'steps' || phase === 'done') {
         enterStepsPhase();
-        if (phase === 'done') {
-            // 已完成：不再显示反思加载，直接显示清空
-        }
     } else {
         document.getElementById('wbInputArea').style.display = '';
         document.getElementById('wbProbeArea').style.display = 'none';
@@ -3332,15 +3422,14 @@ async function handleProbeResult(result) {
         saveWishBottleProgress();
         // 等用户回答（由 wbProbeSend 处理）
     } else if (result.type === 'steps') {
-        // 拿到深度和步骤，直接进入步骤阶段
         const steps = result.steps || [];
         if (!steps.length) return;
         wishBottleData.steps = steps.map(text => ({ text, status: 'pending' }));
         wishBottleData.depth = result.depth || 'long';
         wishBottleData.depthLabel = result.label || '';
-        wishBottleData.phase = 'steps';
+        wishBottleData.phase = 'validating';  // ← 先确认，不直接执行
         saveWishBottleProgress();
-        enterStepsPhase();
+        enterValidatingPhase();
     }
 }
 
