@@ -868,7 +868,12 @@ document.getElementById('modeToggle').addEventListener('click', () => {
     btn.textContent = socraticMode ? '深剖' : '陪伴';
     btn.title = socraticMode ? '切换回陪伴模式' : '切换到深剖模式';
     btn.classList.toggle('socratic-on', socraticMode);
-    // 插入一条提示，告知用户模式已切换
+    // 向 msgHistory 注入模式切换信号，让模型感知上下文变化
+    if (socraticMode) {
+        msgHistory.push({ role: 'system', content: '（对话模式已切换。从现在开始请完全按照深剖模式的指引回应，不再使用之前的陪伴风格。）' });
+    } else {
+        msgHistory.push({ role: 'system', content: '（对话模式已切换回陪伴模式。恢复灵犀的陪伴风格，不再使用深剖模式的提问方式。）' });
+    }
     const note = document.createElement('div');
     note.className = 'history-divider';
     note.textContent = socraticMode ? '── 已切换到深剖模式 ──' : '── 已切换回陪伴模式 ──';
@@ -1038,83 +1043,6 @@ function scrollBottom() {
     chatMsgs.scrollTop = chatMsgs.scrollHeight;
 }
 
-async function send() {
-    const text = chatInput.value.trim();
-    if (!text || isStreaming) return;
-
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    isStreaming = true;
-    chatSendBtn.disabled = true;
-
-    appendUserMsg(text);
-    msgHistory.push({ role: 'user', content: text });
-
-    // Typing indicator
-    const aiEl = document.createElement('div');
-    aiEl.className = 'msg msg-ai typing';
-    chatMsgs.appendChild(aiEl);
-    scrollBottom();
-
-    let aiText = '';
-    try {
-        const resp = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Authorization 由 Cloudflare Worker 在服务端注入
-            },
-            body: JSON.stringify({
-                model: 'deepseek-chat',
-                messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    ...msgHistory.slice(-15),
-                ],
-                stream: true,
-                max_tokens: 1000,
-            }),
-        });
-
-        if (!resp.ok) {
-            const errJson = await resp.json().catch(() => ({}));
-            throw new Error(errJson.error?.message || 'HTTP ' + resp.status);
-        }
-
-        aiEl.classList.remove('typing');
-        const reader = resp.body.getReader();
-        const dec = new TextDecoder();
-
-        outer: while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const lines = dec.decode(value, { stream: true }).split('\n');
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') break outer;
-                try {
-                    const j = JSON.parse(data);
-                    const delta = j.choices?.[0]?.delta?.content || '';
-                    if (delta) {
-                        aiText += delta;
-                        aiEl.innerHTML = renderMd(aiText);
-                        scrollBottom();
-                    }
-                } catch (_) {}
-            }
-        }
-        msgHistory.push({ role: 'assistant', content: aiText });
-
-    } catch (err) {
-        aiEl.classList.remove('typing');
-        aiEl.innerHTML = '<em style="opacity:0.5">出了点问题，再试一次？</em>';
-        console.error('[LingXi API]', err);
-    } finally {
-        isStreaming = false;
-        chatSendBtn.disabled = false;
-        chatInput.focus();
-    }
-}
 
 // (send listeners registered in sendEnhanced block below)
 
