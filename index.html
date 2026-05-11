@@ -543,6 +543,21 @@
         }
         .wb-dir-btn:hover { background:rgba(196,149,106,0.1); border-color:rgba(196,149,106,0.35); color:rgba(255,220,160,0.88); }
         .wb-dir-btn:disabled { opacity:0.35; pointer-events:none; }
+        .wb-dir-custom { display:flex; gap:8px; margin-top:4px; align-items:center; }
+        .wb-dir-custom input {
+            flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+            border-radius:12px; padding:11px 14px; font-family:inherit; font-size:0.85rem;
+            color:rgba(255,255,255,0.7); outline:none; transition:border-color 0.2s;
+        }
+        .wb-dir-custom input::placeholder { color:rgba(255,255,255,0.22); }
+        .wb-dir-custom input:focus { border-color:rgba(196,149,106,0.35); }
+        .wb-dir-custom button {
+            flex-shrink:0; padding:11px 16px; border-radius:12px; font-family:inherit; font-size:0.82rem;
+            background:rgba(196,149,106,0.12); border:1px solid rgba(196,149,106,0.3);
+            color:rgba(255,220,160,0.75); cursor:pointer; transition:all 0.2s; white-space:nowrap;
+        }
+        .wb-dir-custom button:hover { background:rgba(196,149,106,0.22); color:rgba(255,220,160,0.95); }
+        .wb-dir-custom button:disabled { opacity:0.3; pointer-events:none; }
         /* 大纲阶段 */
         #wbScopeArea { display:none; }
         .wb-scope-row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:flex-start; }
@@ -3374,6 +3389,43 @@ function renderDirections(directions) {
         });
         list.appendChild(btn);
     });
+
+    // 自定义方向输入行
+    const customRow = document.createElement('div');
+    customRow.className = 'wb-dir-custom';
+    const customInput = document.createElement('input');
+    customInput.type = 'text';
+    customInput.placeholder = '或者，用自己的话说说方向…';
+    const customBtn = document.createElement('button');
+    customBtn.textContent = '确定';
+
+    async function submitCustomDir() {
+        const dir = customInput.value.trim();
+        if (!dir) return;
+        list.querySelectorAll('.wb-dir-btn, .wb-dir-custom button, .wb-dir-custom input').forEach(el => el.disabled = true);
+        customBtn.textContent = '···';
+        wishBottleData.chosenDirection = dir;
+        wishBottleData.phase = 'scoping';
+        saveWishBottleProgress();
+        try {
+            const scope = await callWishScope(wishBottleData.wish, dir);
+            wishBottleData.scope = scope;
+            wishBottleData.depth = scope.depth || 'long';
+            wishBottleData.depthLabel = scope.depthLabel || '';
+            saveWishBottleProgress();
+            enterScopingPhase();
+        } catch (e) {
+            console.error('[WishDirections custom]', e);
+            list.querySelectorAll('.wb-dir-btn, .wb-dir-custom button, .wb-dir-custom input').forEach(el => el.disabled = false);
+            customBtn.textContent = '确定';
+        }
+    }
+
+    customBtn.addEventListener('click', submitCustomDir);
+    customInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitCustomDir(); });
+    customRow.appendChild(customInput);
+    customRow.appendChild(customBtn);
+    list.appendChild(customRow);
 }
 
 // ── 进入大纲阶段 ──
