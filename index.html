@@ -1926,7 +1926,7 @@ function stripSketchTag(text) {
 function stripSystemTags(text) {
     return text
         .replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '')
-        .replace(/\[STRESS:\d+\]/gi, '')
+        .replace(/\[STRESS[^\]]*\]/gi, '')
         .replace(/\[WISH\]/gi, '')
         .replace(/\[CRISIS\]/gi, '')
         .replace(/\[USED_IMAGE:[^\]]*\]/gi, '')
@@ -2494,7 +2494,7 @@ ttsToggle.addEventListener('click', () => {
 function cleanForTTS(text) {
     return text
         .replace(/\[S?K?ETCH\s*:[^\]]*\]/gi, '')   // 图片标签
-        .replace(/\[STRESS:\d+\]/gi, '')            // 压力标签
+        .replace(/\[STRESS[^\]]*\]/gi, '')            // 压力标签
         .replace(/（[^）]*）/g, '')             // 中文括号内容
         .replace(/\([^)]*\)/g, '')             // 英文括号内容
         .replace(/\*\*(.*?)\*\*/g, '$1')
