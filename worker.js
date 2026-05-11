@@ -264,6 +264,78 @@ async function handleRequest(request, env, origin) {
                     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
                 }
 
+                // ── Wish note routes ─────────────────────────────────
+                if (url.pathname.startsWith('/db/wish/note/')) {
+                    await ensureWishNotesTable(env.DB);
+
+                    // POST /db/wish/note/save
+                    if (url.pathname === '/db/wish/note/save') {
+                        const { wish_text, direction, note_text, created_at } = body;
+                        if (!note_text) return jsonErr(cors(origin), 400, 'Missing note_text');
+                        await env.DB.prepare(
+                            'INSERT INTO wish_notes (user_id, wish_text, direction, note_text, created_at) VALUES (?, ?, ?, ?, ?)'
+                        ).bind(user_id, wish_text || '', direction || '', note_text, created_at || Date.now()).run();
+                        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+                    }
+
+                    // POST /db/wish/note/list
+                    if (url.pathname === '/db/wish/note/list') {
+                        const result = await env.DB.prepare(
+                            'SELECT wish_text, direction, note_text, created_at FROM wish_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT 20'
+                        ).bind(user_id).all();
+                        return new Response(JSON.stringify({ notes: result.results || [] }), { status: 200, headers: h });
+                    }
+                }
+
+                // ── Profile refresh ───────────────────────────────────
+                if (url.pathname === '/db/profile/refresh') {
+                    await ensureSummaryTable(env.DB);
+                    await ensureWishNotesTable(env.DB);
+                    const key = env.DEEPSEEK_API_KEY;
+
+                    // 拉最近30条消息
+                    const msgResult = await env.DB.prepare(
+                        'SELECT role, content FROM messages WHERE user_id = ? ORDER BY ts DESC LIMIT 30'
+                    ).bind(user_id).all();
+                    const recentMsgs = (msgResult.results || []).reverse();
+
+                    // 拉最近10条愿望笔记
+                    const noteResult = await env.DB.prepare(
+                        'SELECT wish_text, direction, note_text FROM wish_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT 10'
+                    ).bind(user_id).all();
+                    const notes = noteResult.results || [];
+
+                    if (recentMsgs.length === 0 && notes.length === 0)
+                        return new Response(JSON.stringify({ ok: true, summary: '' }), { status: 200, headers: h });
+
+                    const notesBlock = notes.length > 0
+                        ? '\n\n用户的愿望笔记（真实感受/行动后反思）：\n' + notes.map(n => `[${n.wish_text}${n.direction ? '·' + n.direction : ''}] ${n.note_text}`).join('\n')
+                        : '';
+
+                    let summaryText = '';
+                    try {
+                        const up = await fetch('https://api.deepseek.com/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                            body: JSON.stringify({
+                                model: 'deepseek-chat', stream: false, max_tokens: 200,
+                                messages: [
+                                    { role: 'system', content: '根据以下对话记录和用户的愿望笔记，提炼该用户的简短画像，包括：常提到的话题、情绪模式、隐含欲望、近期状态、行动风格。用四到五个短句列出，不超过120字，不加解释。' },
+                                    ...recentMsgs.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+                                    ...(notesBlock ? [{ role: 'user', content: notesBlock }] : []),
+                                ],
+                            }),
+                        });
+                        const data = await up.json();
+                        summaryText = data?.choices?.[0]?.message?.content?.trim() || '';
+                    } catch (e) { return jsonErr(cors(origin), 502, 'Profile refresh failed: ' + e.message); }
+
+                    await env.DB.prepare(
+                        'INSERT INTO summaries (user_id, summary_text, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET summary_text=excluded.summary_text, updated_at=excluded.updated_at'
+                    ).bind(user_id, summaryText, Date.now()).run();
+                    return new Response(JSON.stringify({ ok: true, summary: summaryText }), { status: 200, headers: h });
+                }
+
                 // ── Wish session archive routes ───────────────────────
                 if (url.pathname.startsWith('/db/wish/session/')) {
                     await ensureWishSessionTable(env.DB);
@@ -391,6 +463,20 @@ async function ensureEventTable(db) {
             meta       TEXT    DEFAULT NULL
         )`),
         db.prepare(`CREATE INDEX IF NOT EXISTS idx_event_user ON events(user_id, ts)`),
+    ]);
+}
+
+async function ensureWishNotesTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS wish_notes (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    TEXT    NOT NULL,
+            wish_text  TEXT    DEFAULT '',
+            direction  TEXT    DEFAULT '',
+            note_text  TEXT    NOT NULL,
+            created_at INTEGER NOT NULL
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_note_user ON wish_notes(user_id, created_at)`),
     ]);
 }
 
