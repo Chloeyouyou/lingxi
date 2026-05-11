@@ -525,6 +525,76 @@
             font-family: inherit; letter-spacing: 0.08em; transition: background 0.2s; cursor: pointer;
         }
         #wbStartBtn:hover { background: rgba(196,149,106,0.26); }
+        /* 归档按钮（header） */
+        #wbArchiveBtn {
+            font-size:0.72rem; color:rgba(255,255,255,0.28); letter-spacing:0.08em;
+            border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:3px 10px;
+            transition: all 0.2s; margin-right:auto;
+        }
+        #wbArchiveBtn:hover { color:rgba(196,149,106,0.8); border-color:rgba(196,149,106,0.35); }
+        /* 方向选择阶段 */
+        #wbDirectionsArea { display:none; margin-top:4px; }
+        #wbDirHint { font-size:0.78rem; color:rgba(255,255,255,0.3); margin-bottom:16px; letter-spacing:0.03em; line-height:1.6; }
+        .wb-dir-btn {
+            display:block; width:100%; text-align:left; margin-bottom:10px;
+            padding:13px 16px; border-radius:14px; font-family:inherit; font-size:0.88rem;
+            background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+            color:rgba(255,255,255,0.65); cursor:pointer; transition:all 0.2s; line-height:1.5;
+        }
+        .wb-dir-btn:hover { background:rgba(196,149,106,0.1); border-color:rgba(196,149,106,0.35); color:rgba(255,220,160,0.88); }
+        .wb-dir-btn:disabled { opacity:0.35; pointer-events:none; }
+        /* 大纲阶段 */
+        #wbScopeArea { display:none; }
+        .wb-scope-row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); align-items:flex-start; }
+        .wb-scope-icon { flex-shrink:0; font-size:0.8rem; color:rgba(196,149,106,0.5); width:22px; padding-top:1px; }
+        .wb-scope-label { font-size:0.68rem; color:rgba(255,255,255,0.28); margin-bottom:4px; letter-spacing:0.06em; }
+        .wb-scope-text { font-size:0.88rem; color:rgba(255,255,255,0.72); line-height:1.55; }
+        #wbScopeStartBtn {
+            margin-top:22px; width:100%; padding:12px;
+            background:rgba(196,149,106,0.14); border:1px solid rgba(196,149,106,0.35);
+            color:rgba(255,220,160,0.85); border-radius:14px; font-size:0.85rem;
+            font-family:inherit; letter-spacing:0.08em; transition:background 0.2s; cursor:pointer;
+        }
+        #wbScopeStartBtn:hover { background:rgba(196,149,106,0.26); }
+        #wbScopeStartBtn:disabled { opacity:0.35; pointer-events:none; }
+        /* 归档面板 */
+        #wishArchivePanel {
+            position:fixed; inset:0; z-index:360;
+            background:rgba(8,4,2,0.99); display:flex; flex-direction:column;
+            opacity:0; pointer-events:none; transition:opacity 0.3s ease;
+        }
+        #wishArchivePanel.open { opacity:1; pointer-events:auto; }
+        #waHeader {
+            display:flex; align-items:center; gap:10px;
+            padding:20px 28px 14px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0;
+        }
+        #waHeader span { color:rgba(255,255,255,0.7); font-size:0.9rem; letter-spacing:0.15em; flex:1; }
+        #waAnalyzeBtn {
+            font-size:0.72rem; color:rgba(255,255,255,0.3); letter-spacing:0.06em;
+            border:1px dashed rgba(255,255,255,0.15); border-radius:10px; padding:4px 12px;
+            font-family:inherit; cursor:pointer; transition:all 0.2s;
+        }
+        #waAnalyzeBtn:hover { color:rgba(196,149,106,0.8); border-color:rgba(196,149,106,0.35); }
+        #waAnalyzeBtn:disabled { opacity:0.3; pointer-events:none; }
+        #waClose { color:rgba(255,255,255,0.5); font-size:1.4rem; padding:4px 8px; }
+        #waClose:hover { color:rgba(255,255,255,0.9); }
+        #waContent { flex:1; overflow-y:auto; padding:24px clamp(16px,8vw,100px); -webkit-overflow-scrolling:touch; }
+        #waAnalysisArea {
+            margin-bottom:24px; padding:14px 16px;
+            background:rgba(196,149,106,0.06); border:1px solid rgba(196,149,106,0.14);
+            border-radius:14px; font-size:0.87rem; color:rgba(255,240,210,0.82); line-height:1.75;
+        }
+        .wa-empty { font-size:0.84rem; color:rgba(255,255,255,0.25); text-align:center; padding:40px 0; letter-spacing:0.06em; }
+        .wa-item { padding:16px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+        .wa-item-wish { font-size:0.88rem; color:rgba(255,255,255,0.72); margin-bottom:6px; line-height:1.5; }
+        .wa-item-dir { font-size:0.78rem; color:rgba(196,149,106,0.55); margin-bottom:5px; }
+        .wa-item-meta { font-size:0.72rem; color:rgba(255,255,255,0.28); display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+        .wa-continue-btn {
+            padding:4px 12px; border-radius:10px; font-size:0.72rem; font-family:inherit;
+            border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.4);
+            background:transparent; cursor:pointer; transition:all 0.2s;
+        }
+        .wa-continue-btn:hover { border-color:rgba(196,149,106,0.4); color:rgba(255,220,160,0.7); }
         /* 链式执行 */
         #wbEndBtn {
             margin-top: 22px; width: 100%; padding: 12px;
@@ -576,37 +646,6 @@
         }
         #wbReportBtn:hover { border-color: rgba(196,149,106,0.4); color: rgba(255,220,160,0.6); }
         .wb-status { font-size: 0.72rem; color: rgba(255,255,255,0.25); padding-top: 4px; }
-        /* ── 愿望瓶：探针对话区 ── */
-        #wbProbeArea { display: none; margin-top: 4px; }
-        .wb-probe-msg {
-            margin-bottom: 14px; font-size: 0.87rem; line-height: 1.65;
-            padding: 10px 14px; border-radius: 12px; max-width: 88%;
-        }
-        .wb-probe-msg.ai {
-            background: rgba(196,149,106,0.08); color: rgba(255,240,210,0.88);
-            border: 1px solid rgba(196,149,106,0.15); align-self: flex-start;
-        }
-        .wb-probe-msg.user {
-            background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.65);
-            border: 1px solid rgba(255,255,255,0.08); margin-left: auto;
-        }
-        #wbProbeMessages { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
-        #wbProbeInputRow { display: flex; gap: 8px; align-items: flex-end; }
-        #wbProbeInput {
-            flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 14px; padding: 10px 14px; color: rgba(255,255,255,0.82);
-            font-size: 0.85rem; font-family: inherit; resize: none; min-height: 42px; max-height: 100px;
-            outline: none; line-height: 1.5;
-        }
-        #wbProbeInput:focus { border-color: rgba(196,149,106,0.3); }
-        #wbProbeSend {
-            flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
-            background: rgba(196,149,106,0.18); border: 1px solid rgba(196,149,106,0.35);
-            color: rgba(255,220,160,0.85); font-size: 1rem; display: flex;
-            align-items: center; justify-content: center; transition: background 0.2s;
-        }
-        #wbProbeSend:hover { background: rgba(196,149,106,0.32); }
-        #wbProbeSend:disabled { opacity: 0.3; pointer-events: none; }
         /* 深度标签 */
         .wb-depth-tag {
             display: inline-block; font-size: 0.7rem; padding: 2px 10px;
@@ -716,6 +755,7 @@
 <div id="wishBottlePanel">
     <div id="wishBottleHeader">
         <span>愿望瓶</span>
+        <button id="wbArchiveBtn" title="愿望档案">档案</button>
         <button id="wishBottleClose">×</button>
     </div>
     <div id="wishBottleContent">
@@ -724,12 +764,16 @@
             <br>
             <button id="wishBottleSubmit">放入愿望</button>
         </div>
-        <div id="wbProbeArea">
-            <div id="wbProbeMessages"></div>
-            <div id="wbProbeInputRow">
-                <textarea id="wbProbeInput" placeholder="说说你的想法…" rows="1"></textarea>
-                <button id="wbProbeSend">↑</button>
-            </div>
+        <div id="wbDirectionsArea" style="display:none">
+            <div class="wb-wish-title" id="wbDirWishLabel"></div>
+            <div id="wbDirHint">这个愿望可以从不同角度出发，选一个最接近你想法的：</div>
+            <div id="wbDirList"></div>
+        </div>
+        <div id="wbScopeArea" style="display:none">
+            <div class="wb-wish-title" id="wbScopeWishLabel"></div>
+            <div id="wbDepthTagScope"></div>
+            <div id="wbScopeContent"></div>
+            <button id="wbScopeStartBtn">开始行动 →</button>
         </div>
         <div id="wbStepsArea" style="display:none">
             <div class="wb-wish-title" id="wbWishLabel"></div>
@@ -746,6 +790,19 @@
             </div>
             <button id="wishBottleClear">清空，重新开始</button>
         </div>
+    </div>
+</div>
+
+<!-- Wish Archive panel -->
+<div id="wishArchivePanel">
+    <div id="waHeader">
+        <span>愿望档案</span>
+        <button id="waAnalyzeBtn">分析我的愿望</button>
+        <button id="waClose">×</button>
+    </div>
+    <div id="waContent">
+        <div id="waAnalysisArea" style="display:none"></div>
+        <div id="waList"></div>
     </div>
 </div>
 
@@ -3086,118 +3143,105 @@ async function sendEnhanced() {
 function saveWishBottleProgress() {
     localStorage.setItem('lingxi_wish_bottle', JSON.stringify(wishBottleData));
 }
+// ── avoidTypes：跨愿望持久化，独立存储 ──
+let avoidTypes = (() => {
+    try { return JSON.parse(localStorage.getItem('lingxi_avoid_types') || '[]'); } catch { return []; }
+})();
+function saveAvoidTypes() {
+    localStorage.setItem('lingxi_avoid_types', JSON.stringify(avoidTypes));
+}
+
 function loadWishBottleProgress() {
     try {
         const raw = localStorage.getItem('lingxi_wish_bottle');
         if (raw) {
             const d = JSON.parse(raw);
-            // 迁移旧步骤：补 locked / history 字段
             if (Array.isArray(d.steps)) {
                 d.steps = d.steps.map(s => ({ locked: false, history: [], ...s }));
             }
             if (!d.chatHistory) d.chatHistory = [];
             if (!d.depthLabel) d.depthLabel = '';
-            if (!d.avoidTypes) d.avoidTypes = [];
-            // 迁移旧 phase：validating / steps → active
+            if (!d.chosenDirection) d.chosenDirection = '';
+            if (!d.scope) d.scope = null;
+            if (!d.startedAt) d.startedAt = Date.now();
+            // 迁移旧 phase
             if (d.phase === 'validating' || d.phase === 'steps') d.phase = 'active';
+            if (d.phase === 'probing') d.phase = 'directions';
+            delete d.dialogue;
+            delete d.avoidTypes;
             return d;
         }
     } catch (_) {}
-    return { wish: '', steps: [], phase: 'input', depth: '', dialogue: [], depthLabel: '', chatHistory: [], avoidTypes: [] };
+    return { wish: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
 }
 let wishBottleData = loadWishBottleProgress();
-// phase: 'input' | 'probing' | 'active' | 'done'
-// depth: '' | 'short' | 'long'
-// dialogue: [{role:'ai'|'user', content}]  ── 探针对话记录
-// avoidTypes: string[] ── 用户回避的步骤类型
+// phase: 'input' | 'directions' | 'scoping' | 'active' | 'done'
 
-async function callWishSplit(wish) {
+// ── 方向选择：给出3个角度 ──
+async function callWishDirections(wish) {
     const body = {
-        model: 'deepseek-chat',
-        stream: false,
-        max_tokens: 300,
+        model: 'deepseek-chat', stream: false, max_tokens: 150,
         messages: [
             {
                 role: 'system',
-                content: `你是一个愿望拆解助手。将用户的模糊愿望拆解为3个具体、微小、可执行的步骤，每个步骤耗时不超过5分钟。优先选择"信息收集"、"观察"、"书写"类动作，避免需要意志力的行为。只输出JSON，格式：{"steps":["步骤1","步骤2","步骤3"]}，不要其他文字。${userSummary ? '\n用户近期画像：' + userSummary : ''}`
+                content: `用户说出了一个愿望。请给出3个不同角度的解读方向，帮助用户clarify他们真正想要的是什么。
+要求：每个方向≤12字，角度要有明显差异（如：情绪释放 vs 习惯建立 vs 具体目标），用动词开头。
+${userSummary ? '用户近期画像：' + userSummary : ''}
+只输出JSON：{"directions":["方向A","方向B","方向C"]}`
             },
-            { role: 'user', content: wish }
+            { role: 'user', content: `我的愿望：${wish}` }
         ]
     };
     const resp = await fetch(API_URL + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
     const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content?.trim() || '{}';
+    const raw = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g,'').trim();
     try {
-        // Strip possible markdown code fences
-        const clean = text.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(clean);
-        return Array.isArray(parsed.steps) ? parsed.steps : [];
-    } catch {
-        return [];
-    }
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed.directions) ? parsed.directions : [];
+    } catch { return []; }
 }
 
-// ── 探针：问一个问题 或 判断深度并输出步骤 ──
-async function callWishProbe(wish, dialogue) {
-    // dialogue: [{role:'ai'|'user', content}]
-    const history = dialogue.map(m => ({
-        role: m.role === 'ai' ? 'assistant' : 'user',
-        content: m.content
-    }));
+// ── 大纲：根据愿望+方向生成大到小拆解 ──
+async function callWishScope(wish, direction) {
     const body = {
-        model: 'deepseek-chat', stream: false, max_tokens: 300,
+        model: 'deepseek-chat', stream: false, max_tokens: 250,
         messages: [
             {
                 role: 'system',
-                content: `你是灵犀，一个温柔、直觉敏锐的陪伴助手。用户说出了一个愿望。
-你的任务：先提一个探针问题，帮助判断这个愿望的本质——是「短期释放」（需要发泄、放松、暂时逃离），还是「长期目标」（想改变某件事、积累某种能力、成为某种人）。
-最多问1-2个问题。一旦你判断出深度，就停止提问，直接给出拆解结果。
+                content: `用户有一个愿望，已选定方向。请判断这是「短期释放」还是「长期目标」，并生成对应的大纲。
+${userSummary ? '用户近期画像：' + userSummary : ''}
+必须避开的行动类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}
 
-输出格式只能是以下两种之一，不加任何其他文字：
+短期释放输出：{"depth":"short","depthLabel":"10字内概括","goal":"今天想达到的感受或结果（≤20字）"}
+长期目标输出：{"depth":"long","depthLabel":"10字内概括","goal":"终极目标（≤20字）","milestone":"近期里程碑，1-4周内（≤20字）","weeklyAction":"本周可做的一件事（≤20字）"}
 
-如果还需要提问：
-{"type":"question","content":"你想问的一句话（不超过30字，不用"为什么"开头，用具体意象或感受描述）"}
-
-如果已能判断，输出步骤：
-{"type":"steps","depth":"short"或"long","label":"一句概括（10字内）","steps":["步骤1","步骤2","步骤3"]}
-
-short类型的步骤：感官型、立即见效、耗时≤5分钟，帮用户「此刻」感觉好一点。
-long类型的步骤：信息收集型、书写型、微小行动型，是长期改变的第一块砖。
-${userSummary ? '用户近期画像：' + userSummary : ''}`
+只输出JSON，不加其他文字。`
             },
-            { role: 'user', content: `我的愿望：${wish}` },
-            ...history,
+            { role: 'user', content: `愿望：${wish}\n选定方向：${direction}` }
         ]
     };
     const resp = await fetch(API_URL + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
     const data = await resp.json();
-    const text = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    const raw = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g,'').trim();
     try {
-        return JSON.parse(text);
-    } catch {
-        // 解析失败则直接走拆解
-        return { type: 'steps', depth: 'long', label: '', steps: [] };
-    }
+        return JSON.parse(raw);
+    } catch { return { depth: 'long', depthLabel: '', goal: '', milestone: '', weeklyAction: '' }; }
 }
 
 // ── 反思：三步完成后的回应 ──
-async function callWishReflect(wish, depth, dialogue) {
+async function callWishReflect(wish, depth) {
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 120,
         messages: [
             {
                 role: 'system',
-                content: '你是灵犀。用户刚完成了愿望瓶里的三个小步骤。用一到两句话回应——不评价成就感，不给建议，只是说出你观察到的一个细节，或者轻轻问一个此刻的感受。不超过50字。'
+                content: '你是灵犀。用户刚结束了一段愿望瓶的行动。用一到两句话回应——不评价成就感，不给建议，只是说出你观察到的一个细节，或者轻轻问一个此刻的感受。不超过50字。'
             },
-            { role: 'user', content: `愿望：${wish}\n类型：${depth === 'short' ? '短期释放' : '长期目标'}\n之前的对话：${dialogue.map(m=>`${m.role==='ai'?'灵犀':'你'}：${m.content}`).join('\n')}` }
+            { role: 'user', content: `愿望：${wish}\n方向：${wishBottleData.chosenDirection || ''}\n类型：${depth === 'short' ? '短期释放' : '长期目标'}` }
         ]
     };
     const resp = await fetch(API_URL + '/chat', {
@@ -3235,7 +3279,7 @@ async function callWishReplace(wish, failedStep) {
 }
 
 // ── 做不到：换方向 + 记录回避类型 ──
-async function callWishAvoid(wish, failedStep, avoidTypes) {
+async function callWishAvoid(wish, failedStep) {
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 200,
         messages: [
@@ -3264,7 +3308,8 @@ async function callWishAvoid(wish, failedStep, avoidTypes) {
 }
 
 // ── 自动补充候选步骤 ──
-async function callWishRefill(wish, depth, avoidTypes, doneCount) {
+async function callWishRefill(wish, depth, doneCount) {
+    const scope = wishBottleData.scope;
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 100,
         messages: [
@@ -3272,6 +3317,8 @@ async function callWishRefill(wish, depth, avoidTypes, doneCount) {
                 role: 'system',
                 content: `你是一个愿望拆解助手。用户正在逐步实现愿望，已完成 ${doneCount} 步，请生成下一个候选步骤。
 要求：${depth === 'short' ? '感官型、立即见效、耗时≤5分钟' : '信息收集型、书写型或微小行动型，是长期改变的砖'}
+${wishBottleData.chosenDirection ? '用户选定的方向：' + wishBottleData.chosenDirection : ''}
+${scope?.weeklyAction ? '本周行动方向：' + scope.weeklyAction : ''}
 必须避开的类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}
 ${userSummary ? '用户近期画像：' + userSummary : ''}
 只输出一句话（≤20字），不加序号和解释，不加引号。`
@@ -3286,36 +3333,103 @@ ${userSummary ? '用户近期画像：' + userSummary : ''}
     return (data?.choices?.[0]?.message?.content?.trim() || '').replace(/^["「」"『』]/g, '').replace(/["」"』。]$/g, '');
 }
 
-// ── 渲染探针对话 ──
-function renderProbeMessages() {
-    const box = document.getElementById('wbProbeMessages');
-    box.innerHTML = '';
-    (wishBottleData.dialogue || []).forEach(m => {
-        const el = document.createElement('div');
-        el.className = `wb-probe-msg ${m.role}`;
-        el.textContent = m.content;
-        box.appendChild(el);
-    });
-    box.scrollTop = box.scrollHeight;
-}
-
-function addProbeMsg(role, content) {
-    if (!wishBottleData.dialogue) wishBottleData.dialogue = [];
-    wishBottleData.dialogue.push({ role, content });
-    renderProbeMessages();
-}
-
-// ── 进入探针阶段 ──
-function enterProbePhase() {
+// ── 进入方向选择阶段 ──
+function enterDirectionsPhase(directions) {
     document.getElementById('wbInputArea').style.display = 'none';
-    document.getElementById('wbProbeArea').style.display = 'block';
+    document.getElementById('wbDirectionsArea').style.display = 'block';
+    document.getElementById('wbScopeArea').style.display = 'none';
     document.getElementById('wbStepsArea').style.display = 'none';
-    renderProbeMessages();
+    const label = document.getElementById('wbDirWishLabel');
+    if (label) label.textContent = `"${wishBottleData.wish}"`;
+    if (directions) renderDirections(directions);
+    else if (wishBottleData._directions) renderDirections(wishBottleData._directions);
+}
+
+function renderDirections(directions) {
+    wishBottleData._directions = directions;
+    const list = document.getElementById('wbDirList');
+    list.innerHTML = '';
+    directions.forEach(dir => {
+        const btn = document.createElement('button');
+        btn.className = 'wb-dir-btn';
+        btn.textContent = dir;
+        btn.addEventListener('click', async () => {
+            list.querySelectorAll('.wb-dir-btn').forEach(b => b.disabled = true);
+            btn.textContent = dir + ' ···';
+            wishBottleData.chosenDirection = dir;
+            wishBottleData.phase = 'scoping';
+            saveWishBottleProgress();
+            try {
+                const scope = await callWishScope(wishBottleData.wish, dir);
+                wishBottleData.scope = scope;
+                wishBottleData.depth = scope.depth || 'long';
+                wishBottleData.depthLabel = scope.depthLabel || '';
+                saveWishBottleProgress();
+                enterScopingPhase();
+            } catch (e) {
+                console.error('[WishDirections]', e);
+                list.querySelectorAll('.wb-dir-btn').forEach(b => { b.disabled = false; });
+                btn.textContent = dir;
+            }
+        });
+        list.appendChild(btn);
+    });
+}
+
+// ── 进入大纲阶段 ──
+function enterScopingPhase() {
+    document.getElementById('wbInputArea').style.display = 'none';
+    document.getElementById('wbDirectionsArea').style.display = 'none';
+    document.getElementById('wbScopeArea').style.display = 'block';
+    document.getElementById('wbStepsArea').style.display = 'none';
+
+    const label = document.getElementById('wbScopeWishLabel');
+    if (label) label.textContent = `"${wishBottleData.wish}"`;
+
+    const tagEl = document.getElementById('wbDepthTagScope');
+    if (tagEl) {
+        const isShort = wishBottleData.depth === 'short';
+        tagEl.innerHTML = wishBottleData.depthLabel
+            ? `<span class="wb-depth-tag ${isShort ? 'wb-depth-short' : 'wb-depth-long'}">${isShort ? '一次释放' : '长期目标'} · ${wishBottleData.depthLabel}</span>`
+            : '';
+    }
+    renderScope();
+}
+
+function renderScope() {
+    const content = document.getElementById('wbScopeContent');
+    content.innerHTML = '';
+    const scope = wishBottleData.scope;
+    if (!scope) return;
+
+    const rows = wishBottleData.depth === 'short'
+        ? [{ icon: '◎', label: '今天的目标', text: scope.goal }]
+        : [
+            { icon: '◎', label: '终极目标', text: scope.goal },
+            { icon: '◈', label: '近期里程碑', text: scope.milestone },
+            { icon: '◇', label: '本周行动', text: scope.weeklyAction },
+          ];
+
+    rows.forEach(r => {
+        if (!r.text) return;
+        const row = document.createElement('div');
+        row.className = 'wb-scope-row';
+        row.innerHTML = `<span class="wb-scope-icon">${r.icon}</span><div><div class="wb-scope-label">${r.label}</div><div class="wb-scope-text">${r.text}</div></div>`;
+        content.appendChild(row);
+    });
+
+    if (wishBottleData.chosenDirection) {
+        const dirNote = document.createElement('div');
+        dirNote.style.cssText = 'font-size:0.72rem;color:rgba(196,149,106,0.45);margin-top:14px;letter-spacing:0.04em;';
+        dirNote.textContent = `方向：${wishBottleData.chosenDirection}`;
+        content.appendChild(dirNote);
+    }
 }
 
 // ── 进入活跃阶段（链式执行）──
 function enterActivePhase() {
-    document.getElementById('wbProbeArea').style.display = 'none';
+    document.getElementById('wbDirectionsArea').style.display = 'none';
+    document.getElementById('wbScopeArea').style.display = 'none';
     document.getElementById('wbStepsArea').style.display = 'block';
     const tagEl = document.getElementById('wbDepthTag');
     if (tagEl) {
@@ -3444,10 +3558,10 @@ function renderActiveSteps() {
                 failBtn.textContent = '换方向…';
                 const old = wishBottleData.steps[globalIdx].text;
                 try {
-                    const result = await callWishAvoid(wishBottleData.wish, old, wishBottleData.avoidTypes || []);
-                    if (result.avoidTag && !(wishBottleData.avoidTypes || []).includes(result.avoidTag)) {
-                        if (!wishBottleData.avoidTypes) wishBottleData.avoidTypes = [];
-                        wishBottleData.avoidTypes.push(result.avoidTag);
+                    const result = await callWishAvoid(wishBottleData.wish, old);
+                    if (result.avoidTag && !avoidTypes.includes(result.avoidTag)) {
+                        avoidTypes.push(result.avoidTag);
+                        saveAvoidTypes();
                     }
                     if (result.newStep) {
                         wishBottleData.steps[globalIdx].history = [old, ...(wishBottleData.steps[globalIdx].history || [])];
@@ -3512,10 +3626,7 @@ async function autoRefill() {
 
     try {
         const doneCount = wishBottleData.steps.filter(s => s.status === 'done').length;
-        const newText = await callWishRefill(
-            wishBottleData.wish, wishBottleData.depth,
-            wishBottleData.avoidTypes || [], doneCount
-        );
+        const newText = await callWishRefill(wishBottleData.wish, wishBottleData.depth, doneCount);
         if (newText) {
             wishBottleData.steps.push({ text: newText, status: 'pending', locked: false, history: [] });
             saveWishBottleProgress();
@@ -3533,15 +3644,14 @@ async function showActiveConclusion() {
     wishBottleData.phase = 'done';
     saveWishBottleProgress();
     renderDoneActiveSteps();
+    dbWishSessionSave().catch(() => {});
 
     const reflectEl = document.getElementById('wbReflectArea');
     if (reflectEl) {
         reflectEl.style.display = 'block';
         reflectEl.textContent = '…';
         try {
-            const reflection = await callWishReflect(
-                wishBottleData.wish, wishBottleData.depth, wishBottleData.dialogue || []
-            );
+            const reflection = await callWishReflect(wishBottleData.wish, wishBottleData.depth);
             reflectEl.textContent = reflection;
         } catch { reflectEl.style.display = 'none'; }
     }
@@ -3597,8 +3707,7 @@ function renderDoneActiveSteps() {
 async function callWishReport() {
     const doneSteps = wishBottleData.steps.filter(s => s.status === 'done');
     const stepLines = doneSteps.map((s, i) => `第${i+1}步：${s.text}`).join('\n');
-    const avoidNote = (wishBottleData.avoidTypes || []).length > 0
-        ? `\n用户回避的类型：${wishBottleData.avoidTypes.join('、')}` : '';
+    const avoidNote = avoidTypes.length > 0 ? `\n用户回避的类型：${avoidTypes.join('、')}` : '';
     const chatLines = (wishBottleData.chatHistory || [])
         .map(m => `${m.role === 'ai' ? '灵犀' : '你'}：${m.content}`).join('\n');
 
@@ -3622,13 +3731,16 @@ async function callWishReport() {
 function openWishBottle() {
     document.getElementById('wishBottlePanel').classList.add('open');
     const phase = wishBottleData.phase || 'input';
-    if (phase === 'probing') {
-        enterProbePhase();
+    if (phase === 'directions') {
+        enterDirectionsPhase();
+    } else if (phase === 'scoping') {
+        enterScopingPhase();
     } else if (phase === 'active' || phase === 'done') {
         enterActivePhase();
     } else {
         document.getElementById('wbInputArea').style.display = '';
-        document.getElementById('wbProbeArea').style.display = 'none';
+        document.getElementById('wbDirectionsArea').style.display = 'none';
+        document.getElementById('wbScopeArea').style.display = 'none';
         document.getElementById('wbStepsArea').style.display = 'none';
         document.getElementById('wishBottleText').value = '';
     }
@@ -3643,7 +3755,7 @@ document.getElementById('openWishBottleHero').addEventListener('click', openWish
 document.getElementById('openWishBottleChat').addEventListener('click', openWishBottle);
 document.getElementById('wishBottleClose').addEventListener('click', closeWishBottle);
 
-// ── 提交愿望：进入探针阶段 ──
+// ── 提交愿望：进入方向选择 ──
 document.getElementById('wishBottleSubmit').addEventListener('click', async () => {
     const ta = document.getElementById('wishBottleText');
     const wish = ta.value.trim();
@@ -3654,85 +3766,58 @@ document.getElementById('wishBottleSubmit').addEventListener('click', async () =
     btn.textContent = '思考中…';
 
     try {
-        wishBottleData = { wish, steps: [], phase: 'probing', depth: '', dialogue: [], depthLabel: '', chatHistory: [], avoidTypes: [] };
+        wishBottleData = { wish, steps: [], phase: 'directions', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now(), _directions: [] };
         dbWishSave(wish);
         saveWishBottleProgress();
-        enterProbePhase();
+        enterDirectionsPhase([]);  // 先显示空状态
 
-        // 第一轮探针
-        const result = await callWishProbe(wish, []);
-        await handleProbeResult(result);
+        const directions = await callWishDirections(wish);
+        if (!directions.length) throw new Error('No directions returned');
+        wishBottleData._directions = directions;
+        saveWishBottleProgress();
+        renderDirections(directions);
     } catch (e) {
         console.error('[WishBottle]', e);
-        btn.disabled = false;
-        btn.textContent = '放入愿望';
+        // 回退到输入界面
+        document.getElementById('wbInputArea').style.display = '';
+        document.getElementById('wbDirectionsArea').style.display = 'none';
     } finally {
         btn.disabled = false;
         btn.textContent = '放入愿望';
     }
 });
 
-// ── 处理探针返回结果 ──
-async function handleProbeResult(result) {
-    if (!result) return;
-    if (result.type === 'question') {
-        addProbeMsg('ai', result.content);
-        saveWishBottleProgress();
-        // 等用户回答（由 wbProbeSend 处理）
-    } else if (result.type === 'steps') {
-        const steps = result.steps || [];
-        if (!steps.length) return;
-        wishBottleData.steps = steps.map(text => ({ text, status: 'pending', locked: false, history: [] }));
-        wishBottleData.depth = result.depth || 'long';
-        wishBottleData.depthLabel = result.label || '';
+// ── scope 开始行动按钮 ──
+document.getElementById('wbScopeStartBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('wbScopeStartBtn');
+    btn.disabled = true;
+    btn.textContent = '生成步骤中…';
+    try {
+        // 并发生成3个初始步骤
+        const results = await Promise.all([
+            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0),
+            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0),
+            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0)
+        ]);
+        const steps = results.filter(Boolean).map(text => ({ text, status: 'pending', locked: false, history: [] }));
+        if (!steps.length) throw new Error('No steps returned');
+        wishBottleData.steps = steps;
         wishBottleData.phase = 'active';
-        if (!wishBottleData.avoidTypes) wishBottleData.avoidTypes = [];
         saveWishBottleProgress();
         enterActivePhase();
-    }
-}
-
-// ── 探针输入发送 ──
-async function sendProbeReply() {
-    const input = document.getElementById('wbProbeInput');
-    const text = input.value.trim();
-    if (!text) return;
-
-    const sendBtn = document.getElementById('wbProbeSend');
-    sendBtn.disabled = true;
-    input.value = '';
-
-    addProbeMsg('user', text);
-    saveWishBottleProgress();
-
-    // 如果已经问了2轮，强制出步骤
-    const rounds = (wishBottleData.dialogue || []).filter(m => m.role === 'ai').length;
-    try {
-        if (rounds >= 2) {
-            // 强制拆解，不再追问
-            const steps = await callWishSplit(wishBottleData.wish);
-            await handleProbeResult({ type: 'steps', depth: 'long', label: '', steps });
-        } else {
-            const result = await callWishProbe(wishBottleData.wish, wishBottleData.dialogue);
-            await handleProbeResult(result);
-        }
     } catch (e) {
-        console.error('[WishBottle probe]', e);
-    } finally {
-        sendBtn.disabled = false;
+        console.error('[WishBottle scope]', e);
+        btn.disabled = false;
+        btn.textContent = '开始行动 →';
     }
-}
-
-document.getElementById('wbProbeSend').addEventListener('click', sendProbeReply);
-document.getElementById('wbProbeInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendProbeReply(); }
 });
 
 document.getElementById('wishBottleClear').addEventListener('click', () => {
-    wishBottleData = { wish: '', steps: [], phase: 'input', depth: '', dialogue: [], depthLabel: '', chatHistory: [], avoidTypes: [] };
+    wishBottleData = { wish: '', steps: [], phase: 'input', depth: '', depthLabel: '', chatHistory: [], chosenDirection: '', scope: null, startedAt: Date.now() };
     localStorage.removeItem('lingxi_wish_bottle');
     document.getElementById('wishBottleText').value = '';
-    document.getElementById('wbProbeArea').style.display = 'none';
+    document.getElementById('wbDirectionsArea').style.display = 'none';
+    document.getElementById('wbScopeArea').style.display = 'none';
     document.getElementById('wbStepsArea').style.display = 'none';
     document.getElementById('wbInputArea').style.display = '';
     document.getElementById('wbChatMessages').innerHTML = '';
@@ -4161,8 +4246,156 @@ function generateWishReceipt(stepText) {
 // ── 调用小票按钮 ──
 document.getElementById('apiReceiptBtn').addEventListener('click', generateApiReceipt);
 
-// ── 更新 CSS 选择器以包含 apiReceiptBtn ──
-// （已在 HTML CSS 里 #clearMemory, #newSession, #receiptBtn, #historyBtn, #openWishBottleChat 统一声明，需补上）
+// ══════════════════════════════════════════════════
+//  愿望归档 D1 操作
+// ══════════════════════════════════════════════════
+
+async function dbWishSessionSave() {
+    const doneSteps = wishBottleData.steps.filter(s => s.status === 'done');
+    await fetch(API_URL + '/db/wish/session/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: LINGXI_UID,
+            wish_text: wishBottleData.wish,
+            direction: wishBottleData.chosenDirection || '',
+            scope_json: JSON.stringify(wishBottleData.scope || {}),
+            depth: wishBottleData.depth || '',
+            depth_label: wishBottleData.depthLabel || '',
+            steps_done: doneSteps.length,
+            avoid_types: JSON.stringify(avoidTypes),
+            created_at: wishBottleData.startedAt || Date.now(),
+            ended_at: Date.now()
+        })
+    });
+}
+
+async function dbWishSessionList() {
+    const resp = await fetch(API_URL + '/db/wish/session/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: LINGXI_UID })
+    });
+    const data = await resp.json();
+    return data.sessions || [];
+}
+
+async function dbWishSessionAnalysis(sessions) {
+    const resp = await fetch(API_URL + '/db/wish/session/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: LINGXI_UID, sessions })
+    });
+    const data = await resp.json();
+    return data.analysis || '';
+}
+
+// ── 归档面板 ──
+
+async function openWishArchive() {
+    const panel = document.getElementById('wishArchivePanel');
+    panel.classList.add('open');
+    const listEl = document.getElementById('waList');
+    const analysisEl = document.getElementById('waAnalysisArea');
+    listEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:32px 0;">加载中…</div>';
+    analysisEl.style.display = 'none';
+    try {
+        const sessions = await dbWishSessionList();
+        panel._sessions = sessions;
+        renderArchiveList(sessions);
+    } catch {
+        listEl.innerHTML = '<div style="text-align:center;color:rgba(255,100,80,0.6);padding:32px 0;">加载失败，请稍后再试</div>';
+    }
+}
+
+function renderArchiveList(sessions) {
+    const listEl = document.getElementById('waList');
+    if (!sessions.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.25);padding:40px 0;font-size:0.85rem;">还没有完成的愿望记录</div>';
+        return;
+    }
+    listEl.innerHTML = '';
+    sessions.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'wa-item';
+
+        const dateStr = s.ended_at ? new Date(s.ended_at).toLocaleDateString('zh-CN', { month:'numeric', day:'numeric' }) : '';
+        const dirStr = s.direction ? `· ${s.direction}` : '';
+        const depthStr = s.depth_label || (s.depth === 'short' ? '短期' : '长期');
+        const wishShort = (s.wish_text || '').slice(0, 22) + ((s.wish_text || '').length > 22 ? '…' : '');
+
+        item.innerHTML = `
+            <div class="wa-item-wish">${wishShort}</div>
+            <div class="wa-item-meta">
+                <span>${dateStr}</span>
+                <span>${depthStr} ${dirStr}</span>
+                <span>完成 ${s.steps_done || 0} 步</span>
+            </div>
+            <button class="wa-continue-btn" data-idx="${sessions.indexOf(s)}">继续这个愿望</button>`;
+        listEl.appendChild(item);
+    });
+
+    listEl.querySelectorAll('.wa-continue-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const session = sessions[parseInt(btn.dataset.idx)];
+            loadWishFromArchive(session);
+        });
+    });
+}
+
+function loadWishFromArchive(session) {
+    document.getElementById('wishArchivePanel').classList.remove('open');
+    let scope = null;
+    try { scope = JSON.parse(session.scope_json || '{}'); } catch { scope = {}; }
+    wishBottleData = {
+        wish: session.wish_text || '',
+        chosenDirection: session.direction || '',
+        scope: scope,
+        steps: [],
+        phase: 'scoping',
+        depth: session.depth || '',
+        depthLabel: session.depth_label || '',
+        chatHistory: [],
+        startedAt: Date.now(),
+        _directions: []
+    };
+    // 同步 scope.depth 字段
+    if (scope.depth) {
+        wishBottleData.depth = scope.depth;
+        wishBottleData.depthLabel = scope.depthLabel || session.depth_label || '';
+    }
+    saveWishBottleProgress();
+    openWishBottle();
+}
+
+// ── 归档面板事件 ──
+document.getElementById('wbArchiveBtn').addEventListener('click', openWishArchive);
+document.getElementById('waClose').addEventListener('click', () => {
+    document.getElementById('wishArchivePanel').classList.remove('open');
+});
+document.getElementById('wishArchivePanel').addEventListener('click', e => {
+    if (e.target === document.getElementById('wishArchivePanel')) {
+        document.getElementById('wishArchivePanel').classList.remove('open');
+    }
+});
+document.getElementById('waAnalyzeBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('waAnalyzeBtn');
+    const analysisEl = document.getElementById('waAnalysisArea');
+    btn.disabled = true;
+    btn.textContent = '分析中…';
+    analysisEl.style.display = 'block';
+    analysisEl.textContent = '…';
+    try {
+        const sessions = document.getElementById('wishArchivePanel')._sessions || [];
+        const analysis = await dbWishSessionAnalysis(sessions);
+        analysisEl.textContent = analysis || '暂时没有足够的数据进行分析。';
+    } catch {
+        analysisEl.textContent = '分析失败，请稍后再试。';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '分析我的愿望';
+    }
+});
 </script>
 </body>
 </html>

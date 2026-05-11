@@ -263,6 +263,58 @@ async function handleRequest(request, env, origin) {
                     ).bind(wish_id, user_id).run();
                     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
                 }
+
+                // ── Wish session archive routes ───────────────────────
+                if (url.pathname.startsWith('/db/wish/session/')) {
+                    await ensureWishSessionTable(env.DB);
+
+                    // POST /db/wish/session/save
+                    if (url.pathname === '/db/wish/session/save') {
+                        const { wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, created_at, ended_at } = body;
+                        if (!wish_text) return jsonErr(cors(origin), 400, 'Missing wish_text');
+                        await env.DB.prepare(
+                            'INSERT INTO wish_sessions (user_id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                        ).bind(user_id, wish_text, direction || '', scope_json || '{}', depth || '', depth_label || '', steps_done || 0, avoid_types || '[]', created_at || Date.now(), ended_at || Date.now()).run();
+                        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
+                    }
+
+                    // POST /db/wish/session/list
+                    if (url.pathname === '/db/wish/session/list') {
+                        const result = await env.DB.prepare(
+                            'SELECT id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, created_at, ended_at FROM wish_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 30'
+                        ).bind(user_id).all();
+                        return new Response(JSON.stringify({ sessions: result.results || [] }), { status: 200, headers: h });
+                    }
+
+                    // POST /db/wish/session/analysis
+                    if (url.pathname === '/db/wish/session/analysis') {
+                        const { sessions } = body;
+                        if (!Array.isArray(sessions) || sessions.length === 0)
+                            return jsonErr(cors(origin), 400, 'Missing sessions');
+                        const key = env.DEEPSEEK_API_KEY;
+                        const summary = sessions.map(s => {
+                            const avoids = (() => { try { return JSON.parse(s.avoid_types || '[]'); } catch { return []; } })();
+                            return `愿望："${s.wish_text}"，方向：${s.direction || '未选'}，类型：${s.depth || '?'}，完成${s.steps_done}步${avoids.length ? '，回避：' + avoids.join('、') : ''}`;
+                        }).join('\n');
+                        let analysisText = '';
+                        try {
+                            const up = await fetch('https://api.deepseek.com/chat/completions', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                                body: JSON.stringify({
+                                    model: 'deepseek-chat', stream: false, max_tokens: 300,
+                                    messages: [
+                                        { role: 'system', content: '根据用户的愿望历史，生成一段简短洞察（150字内）：他/她的愿望集中在哪些主题；倾向于哪种类型的目标；回避了哪些类型的行动；长期 vs 短期目标的偏好。语气轻描淡写，像朋友说话，不要分析腔。' },
+                                        { role: 'user', content: summary },
+                                    ],
+                                }),
+                            });
+                            const data = await up.json();
+                            analysisText = data?.choices?.[0]?.message?.content?.trim() || '';
+                        } catch (e) { return jsonErr(cors(origin), 502, 'Analysis fetch failed: ' + e.message); }
+                        return new Response(JSON.stringify({ analysis: analysisText }), { status: 200, headers: h });
+                    }
+                }
             }
 
             // ── Route: /db/summarize  ────────────────────────────
@@ -339,6 +391,25 @@ async function ensureEventTable(db) {
             meta       TEXT    DEFAULT NULL
         )`),
         db.prepare(`CREATE INDEX IF NOT EXISTS idx_event_user ON events(user_id, ts)`),
+    ]);
+}
+
+async function ensureWishSessionTable(db) {
+    await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS wish_sessions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT    NOT NULL,
+            wish_text   TEXT    NOT NULL,
+            direction   TEXT    DEFAULT '',
+            scope_json  TEXT    DEFAULT '{}',
+            depth       TEXT    DEFAULT '',
+            depth_label TEXT    DEFAULT '',
+            steps_done  INTEGER DEFAULT 0,
+            avoid_types TEXT    DEFAULT '[]',
+            created_at  INTEGER NOT NULL,
+            ended_at    INTEGER
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_session_user ON wish_sessions(user_id, created_at)`),
     ]);
 }
 
