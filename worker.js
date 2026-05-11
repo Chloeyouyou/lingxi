@@ -407,12 +407,35 @@ async function handleRequest(request, env, origin) {
             }
 
             // ── Route: /db/summarize  ────────────────────────────
+            // 接收对话片段，合并 wish_notes + wish_sessions 后生成统一画像
             if (url.pathname === '/db/summarize') {
                 const { messages } = body;
                 if (!Array.isArray(messages) || messages.length === 0)
                     return jsonErr(cors(origin), 400, 'Missing messages');
                 await ensureSummaryTable(env.DB);
+                await ensureWishNotesTable(env.DB);
+                await ensureWishSessionTable(env.DB);
                 const key = env.DEEPSEEK_API_KEY;
+
+                // 同时拉取愿望笔记和归档记录补充画像
+                const [noteResult, sessionResult] = await Promise.all([
+                    env.DB.prepare('SELECT wish_text, direction, note_text FROM wish_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT 8').bind(user_id).all(),
+                    env.DB.prepare('SELECT wish_text, direction, depth, steps_done, avoid_types FROM wish_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 8').bind(user_id).all(),
+                ]);
+                const notes = noteResult.results || [];
+                const sessions = sessionResult.results || [];
+
+                let contextBlock = '';
+                if (sessions.length > 0) {
+                    contextBlock += '\n愿望历史：\n' + sessions.map(s => {
+                        const av = (() => { try { return JSON.parse(s.avoid_types || '[]'); } catch { return []; } })();
+                        return `"${s.wish_text}" 方向:${s.direction||'—'} 类型:${s.depth==='short'?'短期':'长期'} 完成${s.steps_done}步${av.length?` 回避:${av.join('、')}` : ''}`;
+                    }).join('\n');
+                }
+                if (notes.length > 0) {
+                    contextBlock += '\n行动笔记：\n' + notes.map(n => `[${n.wish_text}] ${n.note_text}`).join('\n');
+                }
+
                 let summaryText = '';
                 try {
                     const up = await fetch('https://api.deepseek.com/chat/completions', {
@@ -421,8 +444,9 @@ async function handleRequest(request, env, origin) {
                         body: JSON.stringify({
                             model: 'deepseek-chat', stream: false, max_tokens: 200,
                             messages: [
-                                { role: 'system', content: '根据以下对话片段，提炼该用户的简短画像，包括：常提到的话题、情绪模式、隐含欲望、近期状态。用四个短句列出，不超过100字，不加解释。' },
+                                { role: 'system', content: '根据以下对话记录、愿望历史和行动笔记，提炼该用户的简短画像：常谈话题、情绪模式、隐含欲望、行动风格、回避倾向。用四到五个短句，不超过120字，不加解释。' },
                                 ...messages,
+                                ...(contextBlock ? [{ role: 'user', content: contextBlock }] : []),
                             ],
                         }),
                     });
