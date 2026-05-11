@@ -3353,8 +3353,10 @@ async function callWishAvoid(wish, failedStep) {
 }
 
 // ── 自动补充候选步骤 ──
-async function callWishRefill(wish, depth, doneCount) {
+async function callWishRefill(wish, depth, doneCount, excludeSteps = []) {
     const scope = wishBottleData.scope;
+    const excludeNote = excludeSteps.length
+        ? `\n已有步骤（不要重复或雷同）：${excludeSteps.join('、')}` : '';
     const body = {
         model: 'deepseek-chat', stream: false, max_tokens: 100,
         messages: [
@@ -3365,7 +3367,7 @@ async function callWishRefill(wish, depth, doneCount) {
 ${wishBottleData.chosenDirection ? '用户选定的方向：' + wishBottleData.chosenDirection : ''}
 ${scope?.weeklyAction ? '本周行动方向：' + scope.weeklyAction : ''}
 必须避开的类型：${avoidTypes.length ? avoidTypes.join('、') : '无'}
-${userSummary ? '用户近期画像：' + userSummary : ''}
+${userSummary ? '用户近期画像：' + userSummary : ''}${excludeNote}
 只输出一句话（≤20字），不加序号和解释，不加引号。`
             },
             { role: 'user', content: `愿望：${wish}` }
@@ -3376,6 +3378,16 @@ ${userSummary ? '用户近期画像：' + userSummary : ''}
     });
     const data = await resp.json();
     return (data?.choices?.[0]?.message?.content?.trim() || '').replace(/^["「」"『』]/g, '').replace(/["」"』。]$/g, '');
+}
+
+// 串行生成 N 个不重复步骤
+async function generateUniqueSteps(wish, depth, doneCount, count = 3) {
+    const results = [];
+    for (let i = 0; i < count; i++) {
+        const step = await callWishRefill(wish, depth, doneCount, results);
+        if (step) results.push(step);
+    }
+    return results;
 }
 
 // ── 进入方向选择阶段 ──
@@ -3727,7 +3739,8 @@ async function autoRefill() {
 
     try {
         const doneCount = wishBottleData.steps.filter(s => s.status === 'done').length;
-        const newText = await callWishRefill(wishBottleData.wish, wishBottleData.depth, doneCount);
+        const existingPending = wishBottleData.steps.filter(s => s.status === 'pending').map(s => s.text);
+        const newText = await callWishRefill(wishBottleData.wish, wishBottleData.depth, doneCount, existingPending);
         if (newText) {
             wishBottleData.steps.push({ text: newText, status: 'pending', locked: false, history: [] });
             saveWishBottleProgress();
@@ -3814,11 +3827,8 @@ function renderDoneActiveSteps() {
         continueBtn.disabled = true;
         continueBtn.textContent = '生成新步骤…';
         try {
-            const results = await Promise.all([
-                callWishRefill(wishBottleData.wish, wishBottleData.depth, wishBottleData.steps.filter(s => s.status === 'done').length),
-                callWishRefill(wishBottleData.wish, wishBottleData.depth, wishBottleData.steps.filter(s => s.status === 'done').length),
-                callWishRefill(wishBottleData.wish, wishBottleData.depth, wishBottleData.steps.filter(s => s.status === 'done').length),
-            ]);
+            const doneCount = wishBottleData.steps.filter(s => s.status === 'done').length;
+            const results = await generateUniqueSteps(wishBottleData.wish, wishBottleData.depth, doneCount);
             const newSteps = results.filter(Boolean).map(text => ({ text, status: 'pending', locked: false, history: [] }));
             if (!newSteps.length) throw new Error('no steps');
             // 保留已完成步骤，追加新候选步骤
@@ -3944,13 +3954,8 @@ document.getElementById('wbScopeStartBtn').addEventListener('click', async () =>
     btn.disabled = true;
     btn.textContent = '生成步骤中…';
     try {
-        // 并发生成3个初始步骤
-        const results = await Promise.all([
-            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0),
-            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0),
-            callWishRefill(wishBottleData.wish, wishBottleData.depth, 0)
-        ]);
-        const steps = results.filter(Boolean).map(text => ({ text, status: 'pending', locked: false, history: [] }));
+        const results = await generateUniqueSteps(wishBottleData.wish, wishBottleData.depth, 0);
+        const steps = results.map(text => ({ text, status: 'pending', locked: false, history: [] }));
         if (!steps.length) throw new Error('No steps returned');
         wishBottleData.steps = steps;
         wishBottleData.phase = 'active';
