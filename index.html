@@ -525,6 +525,37 @@
             font-family: inherit; letter-spacing: 0.08em; transition: background 0.2s; cursor: pointer;
         }
         #wbStartBtn:hover { background: rgba(196,149,106,0.26); }
+        /* 锁定 */
+        .wb-lock-btn {
+            flex-shrink: 0; background: transparent; border: none;
+            color: rgba(255,255,255,0.2); font-size: 0.85rem; cursor: pointer;
+            padding: 0 4px; transition: color 0.2s; line-height: 1;
+        }
+        .wb-lock-btn:hover { color: rgba(196,149,106,0.7); }
+        .wb-lock-btn.locked { color: rgba(196,149,106,0.75); }
+        .wb-step.wb-locked .wb-step-text { color: rgba(196,149,106,0.65); }
+        .wb-step.wb-locked .wb-step-num { border-color: rgba(196,149,106,0.5); color: rgba(196,149,106,0.7); }
+        /* 回溯 */
+        .wb-undo-btn {
+            flex-shrink: 0; background: transparent; border: none;
+            color: rgba(255,255,255,0.18); font-size: 0.72rem; cursor: pointer;
+            padding: 0 3px; transition: color 0.2s; white-space: nowrap;
+        }
+        .wb-undo-btn:hover { color: rgba(255,255,255,0.55); }
+        /* 报告 */
+        #wbReportArea {
+            margin-top: 20px; padding: 16px 18px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px; font-size: 0.84rem; color: rgba(255,255,255,0.6);
+            line-height: 1.8; white-space: pre-wrap;
+        }
+        #wbReportBtn {
+            margin-top: 16px; width: 100%; padding: 10px;
+            background: transparent; border: 1px dashed rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.3); border-radius: 12px; font-size: 0.78rem;
+            font-family: inherit; cursor: pointer; transition: all 0.2s; letter-spacing: 0.06em;
+        }
+        #wbReportBtn:hover { border-color: rgba(196,149,106,0.4); color: rgba(255,220,160,0.6); }
         .wb-status { font-size: 0.72rem; color: rgba(255,255,255,0.25); padding-top: 4px; }
         /* ── 愿望瓶：探针对话区 ── */
         #wbProbeArea { display: none; margin-top: 4px; }
@@ -686,6 +717,7 @@
             <div id="wbDepthTag"></div>
             <div id="wbStepsList"></div>
             <div id="wbReflectArea" style="display:none"></div>
+            <div id="wbReportArea" style="display:none"></div>
             <div id="wbChatArea">
                 <div id="wbChatMessages"></div>
                 <div id="wbChatInputRow">
@@ -1911,6 +1943,33 @@ async function openWishPanel() {
         });
         chatLink.onmouseenter = () => chatLink.style.color = 'rgba(196,149,106,0.85)';
         chatLink.onmouseleave = () => chatLink.style.color = 'rgba(196,149,106,0.45)';
+        // "行动" 按钮 → 带入愿望瓶流程
+        const actionLink = document.createElement('span');
+        actionLink.textContent = '行动';
+        actionLink.title = '用愿望瓶拆解这个愿望';
+        Object.assign(actionLink.style, {
+            fontSize: '0.68rem', color: 'rgba(160,200,180,0.45)',
+            letterSpacing: '0.08em', cursor: 'pointer', flexShrink: '0',
+            transition: 'color 0.2s',
+        });
+        actionLink.onmouseenter = () => actionLink.style.color = 'rgba(160,200,180,0.85)';
+        actionLink.onmouseleave = () => actionLink.style.color = 'rgba(160,200,180,0.45)';
+        actionLink.addEventListener('click', async e => {
+            e.stopPropagation();
+            panel.remove();
+            // 重置愿望瓶并预填愿望，自动触发探针
+            wishBottleData = { wish: wish.wish_text, steps: [], phase: 'input', depth: '', dialogue: [], depthLabel: '', chatHistory: [] };
+            saveWishBottleProgress();
+            openWishBottle();
+            // 自动触发提交
+            await new Promise(r => setTimeout(r, 80));
+            document.getElementById('wishBottleText').value = wish.wish_text;
+            document.getElementById('wishBottleSubmit').click();
+        });
+        row.appendChild(star);
+        row.appendChild(txt);
+        row.appendChild(actionLink);
+
         chatLink.addEventListener('click', e => {
             e.stopPropagation();
             panel.remove();
@@ -1968,7 +2027,7 @@ async function openWishPanel() {
             }, 100);
         });
 
-        row.appendChild(star); row.appendChild(txt); row.appendChild(chatLink);
+        row.appendChild(chatLink);
         list.appendChild(row);
     });
     panel.appendChild(list);
@@ -3011,9 +3070,18 @@ function saveWishBottleProgress() {
 function loadWishBottleProgress() {
     try {
         const raw = localStorage.getItem('lingxi_wish_bottle');
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+            const d = JSON.parse(raw);
+            // 迁移旧步骤：补 locked / history 字段
+            if (Array.isArray(d.steps)) {
+                d.steps = d.steps.map(s => ({ locked: false, history: [], ...s }));
+            }
+            if (!d.chatHistory) d.chatHistory = [];
+            if (!d.depthLabel) d.depthLabel = '';
+            return d;
+        }
     } catch (_) {}
-    return { wish: '', steps: [], phase: 'input', depth: '', dialogue: [] };
+    return { wish: '', steps: [], phase: 'input', depth: '', dialogue: [], depthLabel: '', chatHistory: [] };
 }
 let wishBottleData = loadWishBottleProgress();
 // phase: 'input' | 'probing' | 'steps' | 'done'
@@ -3205,15 +3273,14 @@ function renderValidatingSteps() {
     if (label) label.textContent = `"${wishBottleData.wish}"`;
     list.innerHTML = '';
 
-    // 提示文字
     const hint = document.createElement('div');
     hint.style.cssText = 'font-size:0.78rem;color:rgba(255,255,255,0.3);margin-bottom:14px;letter-spacing:0.04em;';
-    hint.textContent = '这三步合适吗？不合适可以换。';
+    hint.textContent = '🔒 锁定合适的步骤，不合适的可以换或通过对话修改。';
     list.appendChild(hint);
 
     wishBottleData.steps.forEach((step, i) => {
         const row = document.createElement('div');
-        row.className = 'wb-step';
+        row.className = 'wb-step' + (step.locked ? ' wb-locked' : '');
 
         const num = document.createElement('span');
         num.className = 'wb-step-num';
@@ -3223,32 +3290,60 @@ function renderValidatingSteps() {
         txt.className = 'wb-step-text';
         txt.textContent = step.text;
 
+        // 锁定按钮
+        const lockBtn = document.createElement('button');
+        lockBtn.className = 'wb-lock-btn' + (step.locked ? ' locked' : '');
+        lockBtn.title = step.locked ? '解锁此步骤' : '锁定此步骤';
+        lockBtn.textContent = step.locked ? '🔒' : '🔓';
+        lockBtn.addEventListener('click', () => {
+            wishBottleData.steps[i].locked = !wishBottleData.steps[i].locked;
+            saveWishBottleProgress();
+            renderValidatingSteps();
+        });
+
+        // 换一个（未锁定时显示）
         const swapBtn = document.createElement('button');
         swapBtn.className = 'wb-confirm-btn';
-        swapBtn.textContent = '换一个';
+        swapBtn.textContent = '换';
+        swapBtn.style.display = step.locked ? 'none' : '';
         swapBtn.addEventListener('click', async () => {
             swapBtn.disabled = true;
-            swapBtn.textContent = '换中…';
+            swapBtn.textContent = '…';
             try {
                 const replacement = await callWishReplace(wishBottleData.wish, step.text);
                 if (replacement) {
-                    wishBottleData.steps[i] = { text: replacement, status: 'pending' };
+                    const old = wishBottleData.steps[i].text;
+                    wishBottleData.steps[i].history = [old, ...(wishBottleData.steps[i].history || [])];
+                    wishBottleData.steps[i].text = replacement;
+                    wishBottleData.steps[i].status = 'pending';
                     saveWishBottleProgress();
                     renderValidatingSteps();
                 }
-            } catch (e) {
-                swapBtn.disabled = false;
-                swapBtn.textContent = '换一个';
-            }
+            } catch { swapBtn.disabled = false; swapBtn.textContent = '换'; }
         });
 
-        row.appendChild(num);
-        row.appendChild(txt);
-        row.appendChild(swapBtn);
+        // 回溯按钮
+        if (step.history && step.history.length > 0) {
+            const undoBtn = document.createElement('button');
+            undoBtn.className = 'wb-undo-btn';
+            undoBtn.textContent = '↩';
+            undoBtn.title = `上一版：${step.history[0]}`;
+            undoBtn.addEventListener('click', () => {
+                const prev = wishBottleData.steps[i].history[0];
+                wishBottleData.steps[i].history = wishBottleData.steps[i].history.slice(1);
+                wishBottleData.steps[i].text = prev;
+                saveWishBottleProgress();
+                renderValidatingSteps();
+            });
+            row.appendChild(num); row.appendChild(txt);
+            row.appendChild(undoBtn); row.appendChild(lockBtn); row.appendChild(swapBtn);
+        } else {
+            row.appendChild(num); row.appendChild(txt);
+            row.appendChild(lockBtn); row.appendChild(swapBtn);
+        }
         list.appendChild(row);
     });
 
-    // "就这三步，开始"按钮
     const startBtn = document.createElement('button');
     startBtn.id = 'wbStartBtn';
     startBtn.textContent = '就这三步，开始 →';
@@ -3270,6 +3365,7 @@ function renderWishBottleSteps() {
         const li = document.createElement('div');
         li.className = 'wb-step';
         if (step.status === 'done') li.classList.add('wb-done');
+        if (step.locked) li.classList.add('wb-locked');
 
         const num = document.createElement('span');
         num.className = 'wb-step-num';
@@ -3279,8 +3375,36 @@ function renderWishBottleSteps() {
         txt.className = 'wb-step-text';
         txt.textContent = step.text;
 
+        // 锁定按钮（始终显示）
+        const lockBtn = document.createElement('button');
+        lockBtn.className = 'wb-lock-btn' + (step.locked ? ' locked' : '');
+        lockBtn.title = step.locked ? '解锁（可通过对话修改）' : '锁定此步骤';
+        lockBtn.textContent = step.locked ? '🔒' : '🔓';
+        lockBtn.addEventListener('click', () => {
+            wishBottleData.steps[i].locked = !wishBottleData.steps[i].locked;
+            saveWishBottleProgress();
+            renderWishBottleSteps();
+        });
+
+        // 回溯按钮
+        const undoBtn = document.createElement('button');
+        undoBtn.className = 'wb-undo-btn';
+        undoBtn.textContent = '↩';
+        undoBtn.style.display = (step.history && step.history.length > 0) ? '' : 'none';
+        undoBtn.title = step.history?.[0] ? `恢复：${step.history[0]}` : '';
+        undoBtn.addEventListener('click', () => {
+            if (!wishBottleData.steps[i].history?.length) return;
+            const prev = wishBottleData.steps[i].history[0];
+            wishBottleData.steps[i].history = wishBottleData.steps[i].history.slice(1);
+            wishBottleData.steps[i].text = prev;
+            saveWishBottleProgress();
+            renderWishBottleSteps();
+        });
+
         li.appendChild(num);
         li.appendChild(txt);
+        li.appendChild(undoBtn);
+        li.appendChild(lockBtn);
 
         if (step.status === 'pending') {
             const btns = document.createElement('div');
@@ -3294,7 +3418,6 @@ function renderWishBottleSteps() {
                 wishBottleData.steps[i].status = 'done';
                 saveWishBottleProgress();
                 renderWishBottleSteps();
-                // 生成愿望小票
                 setTimeout(() => generateWishReceipt(stepText), 400);
                 if (wishBottleData.steps.every(s => s.status === 'done')) {
                     setTimeout(() => showWishBottleCongrats(), 300);
@@ -3304,12 +3427,16 @@ function renderWishBottleSteps() {
             const failBtn = document.createElement('button');
             failBtn.className = 'wb-btn wb-btn-fail';
             failBtn.textContent = '✗ 做不到';
+            failBtn.style.display = step.locked ? 'none' : '';  // 锁定后不能跳过
             failBtn.addEventListener('click', async () => {
                 failBtn.disabled = true;
-                failBtn.textContent = '换一个…';
-                const replacement = await callWishReplace(wishBottleData.wish, step.text);
+                failBtn.textContent = '换中…';
+                const old = wishBottleData.steps[i].text;
+                const replacement = await callWishReplace(wishBottleData.wish, old);
                 if (replacement) {
-                    wishBottleData.steps[i] = { text: replacement, status: 'pending' };
+                    wishBottleData.steps[i].history = [old, ...(wishBottleData.steps[i].history || [])];
+                    wishBottleData.steps[i].text = replacement;
+                    wishBottleData.steps[i].status = 'pending';
                 } else {
                     wishBottleData.steps[i].status = 'failed';
                 }
@@ -3344,19 +3471,58 @@ async function showWishBottleCongrats() {
     // 灵犀反思回应
     const reflectEl = document.getElementById('wbReflectArea');
     if (reflectEl) {
-        reflectEl.style.display = '';
+        reflectEl.style.display = 'block';
         reflectEl.textContent = '…';
         try {
             const reflection = await callWishReflect(
-                wishBottleData.wish,
-                wishBottleData.depth,
-                wishBottleData.dialogue || []
+                wishBottleData.wish, wishBottleData.depth, wishBottleData.dialogue || []
             );
             reflectEl.textContent = reflection;
-        } catch {
-            reflectEl.style.display = 'none';
-        }
+        } catch { reflectEl.style.display = 'none'; }
     }
+
+    // 长期目标：提供报告按钮
+    if (wishBottleData.depth === 'long') {
+        const reportBtn = document.createElement('button');
+        reportBtn.id = 'wbReportBtn';
+        reportBtn.textContent = '生成行动报告';
+        reportBtn.addEventListener('click', async () => {
+            reportBtn.disabled = true;
+            reportBtn.textContent = '生成中…';
+            const reportEl = document.getElementById('wbReportArea');
+            reportEl.style.display = 'block';
+            reportEl.textContent = '…';
+            try {
+                reportEl.textContent = await callWishReport();
+            } catch { reportEl.textContent = '生成失败，请稍后再试。'; }
+            reportBtn.remove();
+        });
+        list.appendChild(reportBtn);
+    }
+}
+
+async function callWishReport() {
+    const stepLines = wishBottleData.steps.map((s, i) =>
+        `步骤${i+1}：${s.text}（${s.status === 'done' ? '完成' : '跳过'}）`
+    ).join('\n');
+    const chatLines = (wishBottleData.chatHistory || [])
+        .map(m => `${m.role === 'ai' ? '灵犀' : '你'}：${m.content}`).join('\n');
+
+    const body = {
+        model: 'deepseek-chat', stream: false, max_tokens: 500,
+        messages: [
+            {
+                role: 'system',
+                content: '你是灵犀。根据用户完成愿望瓶步骤的过程，生成一份简短的行动报告（200字以内）。格式：第一段说明愿望和类型；第二段列出三步的完成情况；第三段从对话中提炼一句用户自己说出的关键句；第四段给一句灵犀的话。语气温柔，不套话。'
+            },
+            { role: 'user', content: `愿望："${wishBottleData.wish}"\n类型：长期目标·${wishBottleData.depthLabel}\n\n步骤：\n${stepLines}\n\n对话摘录：\n${chatLines || '（无对话记录）'}` }
+        ]
+    };
+    const resp = await fetch(API_URL + '/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    return data?.choices?.[0]?.message?.content?.trim() || '';
 }
 
 function openWishBottle() {
@@ -3484,25 +3650,31 @@ document.getElementById('wishBottleClear').addEventListener('click', () => {
 // ══════════════════════════════════════════════════
 
 async function callWishChat(userMsg) {
-    const doneCnt  = wishBottleData.steps.filter(s => s.status === 'done').length;
-    const totalCnt = wishBottleData.steps.length;
     const stepsSummary = wishBottleData.steps.map((s, i) =>
-        `步骤${i+1}（${s.status === 'done' ? '已完成' : s.status === 'failed' ? '跳过' : '未完成'}）：${s.text}`
+        `步骤${i+1}（${s.status==='done'?'已完成':s.status==='failed'?'跳过':'未完成'}，${s.locked?'已锁定':'未锁定'}）：${s.text}`
     ).join('\n');
 
     const body = {
-        model: 'deepseek-chat', stream: false, max_tokens: 200,
+        model: 'deepseek-chat', stream: false, max_tokens: 250,
         messages: [
             {
                 role: 'system',
-                content: `你是灵犀，用户正在用愿望瓶处理一个愿望。
+                content: `你是灵犀，用户在愿望瓶里处理一个愿望。
 愿望："${wishBottleData.wish}"
 类型：${wishBottleData.depth === 'short' ? '短期释放' : '长期目标'}
-当前进度：${doneCnt}/${totalCnt} 步完成
 步骤详情：\n${stepsSummary}
-之前的对话背景：${(wishBottleData.dialogue||[]).map(m=>`${m.role==='ai'?'灵犀':'你'}：${m.content}`).join('｜')}
 
-用户现在向你提问或说了什么。请用1-3句话回应，温柔、具体、不说废话。`
+判断用户意图：
+A. 普通聊天/提问/吐槽
+B. 要修改某个步骤（如"第二步太难""换掉步骤1""把第三步改成..."）
+
+如果是 B 且目标步骤未锁定，输出：
+{"reply":"我把第N步调整了…（1句）","update":{"index":N-1,"text":"新步骤文字（具体可执行，≤20字）"}}
+
+如果是 A，或目标步骤已锁定，输出：
+{"reply":"1-2句温柔回应"}
+
+只输出JSON，不加其他内容。`
             },
             { role: 'user', content: userMsg }
         ]
@@ -3513,7 +3685,8 @@ async function callWishChat(userMsg) {
         body: JSON.stringify(body)
     });
     const data = await resp.json();
-    return data?.choices?.[0]?.message?.content?.trim() || '';
+    const raw = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g,'').trim();
+    try { return JSON.parse(raw); } catch { return { reply: raw }; }
 }
 
 function appendWbChatMsg(role, content) {
@@ -3533,9 +3706,33 @@ async function sendWbChat() {
     sendBtn.disabled = true;
     input.value = '';
     appendWbChatMsg('user', text);
+    // 存入 chatHistory 用于报告
+    if (!wishBottleData.chatHistory) wishBottleData.chatHistory = [];
+    wishBottleData.chatHistory.push({ role: 'user', content: text });
     try {
-        const reply = await callWishChat(text);
-        if (reply) appendWbChatMsg('ai', reply);
+        const result = await callWishChat(text);
+        const reply = result?.reply || '';
+        if (reply) {
+            appendWbChatMsg('ai', reply);
+            wishBottleData.chatHistory.push({ role: 'ai', content: reply });
+        }
+        // 实时更新步骤
+        if (result?.update) {
+            const { index, text: newText } = result.update;
+            if (index >= 0 && index < wishBottleData.steps.length && !wishBottleData.steps[index].locked) {
+                const old = wishBottleData.steps[index].text;
+                wishBottleData.steps[index].history = [old, ...(wishBottleData.steps[index].history || [])];
+                wishBottleData.steps[index].text = newText;
+                saveWishBottleProgress();
+                renderWishBottleSteps();
+                // 提示步骤已更新
+                const tip = document.createElement('div');
+                tip.style.cssText = 'font-size:0.72rem;color:rgba(196,149,106,0.6);margin:4px 0 0 0;';
+                tip.textContent = `↑ 步骤 ${index+1} 已更新`;
+                document.getElementById('wbChatMessages').appendChild(tip);
+            }
+        }
+        saveWishBottleProgress();
     } catch (e) {
         console.error('[WbChat]', e);
     } finally {
