@@ -3102,7 +3102,7 @@ function addProbeMsg(role, content) {
 // ── 进入探针阶段 ──
 function enterProbePhase() {
     document.getElementById('wbInputArea').style.display = 'none';
-    document.getElementById('wbProbeArea').style.display = '';
+    document.getElementById('wbProbeArea').style.display = 'block';
     document.getElementById('wbStepsArea').style.display = 'none';
     renderProbeMessages();
 }
@@ -3110,7 +3110,7 @@ function enterProbePhase() {
 // ── 进入步骤阶段 ──
 function enterStepsPhase() {
     document.getElementById('wbProbeArea').style.display = 'none';
-    document.getElementById('wbStepsArea').style.display = '';
+    document.getElementById('wbStepsArea').style.display = 'block';
     // 深度标签
     const tagEl = document.getElementById('wbDepthTag');
     if (tagEl) {
