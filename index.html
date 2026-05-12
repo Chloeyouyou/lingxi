@@ -220,6 +220,61 @@
         #receiptSaveBtn:hover { background: rgba(196,149,106,0.32); }
         #receiptCloseBtn { background: transparent; color: rgba(255,255,255,0.4); }
         #receiptCloseBtn:hover { color: rgba(255,255,255,0.75); }
+        /* ── 小票选项底部弹窗 ── */
+        #receiptOptsOverlay {
+            position: fixed; inset: 0; z-index: 600;
+            background: rgba(10,8,4,0.72); backdrop-filter: blur(6px);
+            display: flex; align-items: flex-end; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        #receiptOptsOverlay.open { opacity: 1; pointer-events: auto; }
+        #receiptOptsBox {
+            width: 100%; max-width: 480px;
+            background: #1a140d; border-top: 1px solid rgba(196,149,106,0.25);
+            border-radius: 20px 20px 0 0; padding: 22px 24px 36px;
+            transform: translateY(24px); transition: transform 0.25s;
+        }
+        #receiptOptsOverlay.open #receiptOptsBox { transform: translateY(0); }
+        #receiptOptsTitle {
+            margin: 0 0 18px; font-size: 0.88rem; font-weight: 500;
+            color: rgba(196,149,106,0.9); letter-spacing: 0.1em; text-align: center;
+        }
+        .receipt-opt-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .receipt-opt-item:last-of-type { border-bottom: none; }
+        .receipt-opt-label { font-size: 0.84rem; color: rgba(255,255,255,0.72); }
+        .receipt-opt-toggle {
+            width: 44px; height: 24px; border-radius: 12px;
+            background: rgba(255,255,255,0.12); border: none; cursor: pointer;
+            position: relative; transition: background 0.2s; flex-shrink: 0;
+        }
+        .receipt-opt-toggle.on { background: rgba(196,149,106,0.7); }
+        .receipt-opt-toggle::after {
+            content: ''; position: absolute; top: 3px; left: 3px;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: #fff; transition: transform 0.2s;
+        }
+        .receipt-opt-toggle.on::after { transform: translateX(20px); }
+        .receipt-opt-select { display: flex; gap: 6px; }
+        .receipt-opt-select button {
+            padding: 4px 10px; border-radius: 10px; font-size: 0.75rem; font-family: inherit;
+            border: 1px solid rgba(196,149,106,0.3); background: transparent;
+            color: rgba(255,255,255,0.45); cursor: pointer; transition: all 0.15s;
+        }
+        .receipt-opt-select button.sel-active {
+            background: rgba(196,149,106,0.25); color: rgba(255,220,160,0.9);
+            border-color: rgba(196,149,106,0.6);
+        }
+        #receiptOptsConfirm {
+            width: 100%; margin-top: 20px; padding: 12px;
+            background: rgba(196,149,106,0.18); color: rgba(255,220,160,0.9);
+            border: 1px solid rgba(196,149,106,0.38); border-radius: 20px;
+            font-size: 0.85rem; font-family: inherit; cursor: pointer; transition: background 0.2s;
+        }
+        #receiptOptsConfirm:hover { background: rgba(196,149,106,0.32); }
+
         .history-divider {
             align-self: center; color: rgba(255,255,255,0.2);
             font-size: 0.72rem; letter-spacing: 0.12em;
@@ -2781,9 +2836,9 @@ function enterReceiptMode() {
 
     document.getElementById('receiptGenerate').addEventListener('click', () => {
         if (receiptSelected.length === 0) return;
+        exitReceiptMode();
         generateChatReceipt(receiptSelected);
         trackEvent('receipt_generated', { count: receiptSelected.length });
-        exitReceiptMode();
     });
 }
 
@@ -4473,6 +4528,111 @@ if (apiReceiptBtn) {
     });
 })();
 
+// ── 小票选项弹窗 ──
+(function buildReceiptOptsDOM() {
+    const overlay = document.createElement('div');
+    overlay.id = 'receiptOptsOverlay';
+    overlay.innerHTML = `
+        <div id="receiptOptsBox">
+            <h3 id="receiptOptsTitle">自定义小票</h3>
+            <div id="receiptOptsList"></div>
+            <button id="receiptOptsConfirm">生成小票</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+})();
+
+const RECEIPT_OPTS_DEFS = {
+    chat: {
+        title: '💬 对话小票 · 内容选择',
+        items: [
+            { key: 'showRatio',   label: '发言占比',  type: 'toggle', def: true },
+            { key: 'showQuality', label: '对话质感标签', type: 'toggle', def: true },
+            { key: 'fragments',   label: '对话片段',  type: 'select',
+              choices: [{v:2,l:'2条'},{v:4,l:'4条'},{v:0,l:'全部'}], def: 4 },
+        ]
+    },
+    api: {
+        title: '🧾 调用小票 · 内容选择',
+        items: [
+            { key: 'showCny',   label: '人民币估算', type: 'toggle', def: true },
+            { key: 'showCum',   label: '累计消耗',   type: 'toggle', def: true },
+            { key: 'showRatio', label: '输入/输出比', type: 'toggle', def: true },
+        ]
+    },
+    wish: {
+        title: '✦ 愿望小票 · 内容选择',
+        items: [
+            { key: 'showIntent', label: '核心意图', type: 'toggle', def: true },
+            { key: 'showGoal',   label: '目标',     type: 'toggle', def: true },
+        ]
+    }
+};
+
+function getReceiptOpts(type) {
+    const defs = RECEIPT_OPTS_DEFS[type];
+    const saved = JSON.parse(localStorage.getItem(`lingxi_receipt_opts_${type}`) || '{}');
+    const opts = {};
+    defs.items.forEach(item => {
+        opts[item.key] = item.key in saved ? saved[item.key] : item.def;
+    });
+    return opts;
+}
+
+function showReceiptOptions(type, onConfirm) {
+    const def = RECEIPT_OPTS_DEFS[type];
+    const opts = getReceiptOpts(type);
+    const current = { ...opts };
+
+    document.getElementById('receiptOptsTitle').textContent = def.title;
+    const list = document.getElementById('receiptOptsList');
+    list.innerHTML = '';
+
+    def.items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'receipt-opt-item';
+
+        if (item.type === 'toggle') {
+            row.innerHTML = `
+                <span class="receipt-opt-label">${item.label}</span>
+                <button class="receipt-opt-toggle ${current[item.key] ? 'on' : ''}" data-key="${item.key}"></button>`;
+            row.querySelector('button').addEventListener('click', function() {
+                current[item.key] = !current[item.key];
+                this.classList.toggle('on', current[item.key]);
+            });
+        } else if (item.type === 'select') {
+            const btnHtml = item.choices.map(c =>
+                `<button class="${current[item.key] === c.v ? 'sel-active' : ''}" data-val="${c.v}">${c.l}</button>`
+            ).join('');
+            row.innerHTML = `
+                <span class="receipt-opt-label">${item.label}</span>
+                <div class="receipt-opt-select">${btnHtml}</div>`;
+            row.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    current[item.key] = Number(this.dataset.val);
+                    row.querySelectorAll('button').forEach(b => b.classList.toggle('sel-active', b === this));
+                });
+            });
+        }
+        list.appendChild(row);
+    });
+
+    const overlay = document.getElementById('receiptOptsOverlay');
+    // Replace confirm btn to clear old listeners
+    const oldConfirm = document.getElementById('receiptOptsConfirm');
+    const newConfirm = oldConfirm.cloneNode(true);
+    oldConfirm.replaceWith(newConfirm);
+    newConfirm.addEventListener('click', () => {
+        localStorage.setItem(`lingxi_receipt_opts_${type}`, JSON.stringify(current));
+        overlay.classList.remove('open');
+        onConfirm(current);
+    });
+
+    overlay.classList.add('open');
+}
+
 let _receiptBlobUrl = null;
 function showReceiptPreview(canvas, filename) {
     canvas.toBlob(blob => {
@@ -4626,17 +4786,26 @@ function nowStr() {
 // ════════════════════════════════
 //  1. 对话小票
 // ════════════════════════════════
-function generateChatReceipt(msgEls) {
+function generateChatReceipt(msgEls, opts) {
+    if (!opts) { showReceiptOptions('chat', o => generateChatReceipt(msgEls, o)); return; }
     const entries = msgEls.map(el => ({
         isUser: el.classList.contains('msg-user'),
         text: (el.innerText || el.textContent).replace(/🔊/g,'').replace(/\s+/g,' ').trim(),
     }));
-    const userCount = entries.filter(e => e.isUser).length;
-    const aiCount   = entries.filter(e => !e.isUser).length;
-    const avgLen    = entries.reduce((s,e) => s + e.text.length, 0) / entries.length;
-    const depth     = avgLen > 80 ? '★★★★☆' : avgLen > 40 ? '★★★☆☆' : '★★☆☆☆';
-    const no        = receiptNo('CHAT');
-    const snippet   = entries[0].text.slice(0, 20) + (entries[0].text.length > 20 ? '…' : '');
+    const userCount  = entries.filter(e => e.isUser).length;
+    const aiCount    = entries.filter(e => !e.isUser).length;
+    const userWords  = entries.filter(e => e.isUser).reduce((s,e) => s + e.text.length, 0);
+    const totalWords = entries.reduce((s,e) => s + e.text.length, 0);
+    const userRatio  = totalWords > 0 ? Math.round(userWords / totalWords * 100) : 0;
+    const avgLen     = totalWords / entries.length;
+    const depthStars = avgLen > 80 ? '★★★★☆' : avgLen > 40 ? '★★★☆☆' : '★★☆☆☆';
+    const depthLabel = avgLen > 80 ? '深度对话' : avgLen > 40 ? '较深入' : '轻松聊天';
+    const no         = receiptNo('CHAT');
+    const longestUser = entries.filter(e => e.isUser).sort((a,b) => b.text.length - a.text.length)[0];
+    const quote = longestUser ? longestUser.text.slice(0, 22) + (longestUser.text.length > 22 ? '…' : '') : '';
+    // fragments based on opts.fragments: 0=all, 2/4=N
+    const fragN = opts.fragments === 0 ? entries.length : (opts.fragments || 4);
+    const pick  = entries.length <= fragN ? entries : [...entries.slice(0, Math.ceil(fragN/2)), ...entries.slice(-Math.floor(fragN/2))];
 
     const sections = [
         { type: 'spacer', h: 4 },
@@ -4645,15 +4814,17 @@ function generateChatReceipt(msgEls) {
         { type: 'subtitle', text: nowStr() },
         { type: 'divider' },
         { type: 'row', key: '消息总数', val: `${entries.length} 条` },
-        { type: 'row', key: '你说了', val: `${userCount} 条` },
+        { type: 'row', key: '你说了',   val: `${userCount} 条` },
         { type: 'row', key: '灵犀说了', val: `${aiCount} 条` },
+        ...(opts.showRatio ? [{ type: 'row', key: '你的发言占比', val: `${userRatio}%`, dim: true }] : []),
         { type: 'divider' },
-        { type: 'row', key: '关键片段', val: '' },
-        ...entries.map(e => ({ type: 'indent', text: `${e.isUser ? '你' : '灵犀'}："${e.text.slice(0,22)}${e.text.length>22?'…':''}"` })),
+        { type: 'row', key: '对话片段', val: '' },
+        ...pick.map(e => ({ type: 'indent', text: `${e.isUser ? '你' : '灵犀'}："${e.text.slice(0,20)}${e.text.length>20?'…':''}"` })),
         { type: 'divider' },
-        { type: 'row', key: '深度指数', val: depth },
-        { type: 'spacer', h: 6 },
-        { type: 'footer', text: `"${snippet}"` },
+        { type: 'row', key: '深度指数', val: depthStars },
+        ...(opts.showQuality ? [{ type: 'row', key: '对话质感', val: depthLabel, dim: true }] : []),
+        { type: 'spacer', h: 4 },
+        { type: 'footer', text: quote ? `"${quote}"` : '── 有些话，说出来就不同了 ──' },
         { type: 'footer', text: '── 心镜 · 对话存档 ──' },
     ];
     const cvs = makeReceiptCanvas(sections);
@@ -4663,16 +4834,22 @@ function generateChatReceipt(msgEls) {
 // ════════════════════════════════
 //  2. 调用小票
 // ════════════════════════════════
-function generateApiReceipt() {
+function generateApiReceipt(opts) {
+    if (!opts) { showReceiptOptions('api', o => generateApiReceipt(o)); return; }
     const u = lastApiUsage;
     const isDemo = !u;
     const pt  = u?.prompt_tokens     ?? 1240;
     const ct  = u?.completion_tokens ?? 380;
     const tot = u?.total_tokens      ?? (pt + ct);
-    // DeepSeek-chat 价格 (USD/1M tokens)
     const INPUT_PRICE  = 0.27;
     const OUTPUT_PRICE = 1.10;
-    const cost = ((pt * INPUT_PRICE + ct * OUTPUT_PRICE) / 1_000_000).toFixed(5);
+    const costUsd = (pt * INPUT_PRICE + ct * OUTPUT_PRICE) / 1_000_000;
+    const costCny = costUsd * 7.2;
+    const ratio   = ct > 0 ? (pt / ct).toFixed(1) : '—';
+    const cumKey  = 'lingxi_api_cost_cny';
+    const cumPrev = parseFloat(localStorage.getItem(cumKey) || '0');
+    const cumNew  = cumPrev + costCny;
+    if (!isDemo) localStorage.setItem(cumKey, cumNew.toFixed(6));
     const no = receiptNo('API');
 
     const sections = [
@@ -4684,13 +4861,16 @@ function generateApiReceipt() {
         { type: 'row', key: '服务商', val: 'DeepSeek' },
         { type: 'row', key: '模型',   val: 'deepseek-chat' },
         { type: 'divider' },
-        { type: 'row', key: '项目',        val: 'Tokens' },
         { type: 'row', key: '输入 tokens', val: pt.toLocaleString() },
         { type: 'row', key: '输出 tokens', val: ct.toLocaleString() },
+        ...(opts.showRatio ? [{ type: 'row', key: '输入/输出比', val: `${ratio} : 1`, dim: true }] : []),
         { type: 'divider' },
         { type: 'row', key: '合计 tokens', val: tot.toLocaleString(), bold: true },
-        { type: 'row', key: '费用估算 (USD)', val: `$${cost}`, bold: true },
-        { type: 'row', key: '计价日期', val: '2025-07', dim: true },
+        ...(opts.showCny ? [{ type: 'row', key: '本次费用', val: `¥ ${costCny.toFixed(4)}`, bold: true }] : [
+            { type: 'row', key: '本次费用 (USD)', val: `$${costUsd.toFixed(5)}`, bold: true },
+        ]),
+        ...(opts.showCum ? [{ type: 'row', key: '累计消耗', val: `¥ ${cumNew.toFixed(3)}`, dim: true }] : []),
+        ...(opts.showCny ? [{ type: 'row', key: '参考汇率', val: 'USD/CNY 7.2', dim: true }] : []),
         { type: 'divider' },
         { type: 'spacer', h: 4 },
         { type: 'footer', text: isDemo ? '※ 无最新调用记录，展示演示数据' : '此为快照，不含税费' },
@@ -4705,7 +4885,8 @@ function generateApiReceipt() {
 // ════════════════════════════════
 let completedStepsTotal = parseInt(localStorage.getItem('lingxi_completed_steps') || '0');
 
-function generateWishReceipt(stepText) {
+function generateWishReceipt(stepText, opts) {
+    if (!opts) { showReceiptOptions('wish', o => generateWishReceipt(stepText, o)); return; }
     completedStepsTotal++;
     localStorage.setItem('lingxi_completed_steps', String(completedStepsTotal));
     const no = receiptNo('WISH');
@@ -4728,13 +4909,13 @@ function generateWishReceipt(stepText) {
         { type: 'divider' },
         { type: 'row',    key: '愿望', val: '' },
         { type: 'indent', text: wishText.slice(0, 28) + (wishText.length > 28 ? '…' : '') },
-        ...(direction ? [
+        ...(opts.showIntent && direction ? [
             { type: 'spacer', h: 3 },
             { type: 'row',    key: '核心意图', val: '' },
             { type: 'indent', text: direction.slice(0, 28) + (direction.length > 28 ? '…' : '') },
         ] : []),
-        ...(goal ? [
-            { type: 'row', key: depthLabel || '目标', val: goal.slice(0, 18) + (goal.length > 18 ? '…' : ''), dim: false },
+        ...(opts.showGoal && goal ? [
+            { type: 'row', key: depthLabel || '目标', val: goal.slice(0, 18) + (goal.length > 18 ? '…' : '') },
         ] : []),
         { type: 'spacer', h: 3 },
         { type: 'row',    key: '完成步骤', val: '' },
