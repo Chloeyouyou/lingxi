@@ -171,13 +171,13 @@
             border-left: 2px solid rgba(196,149,106,0.4);
             padding-left: 14px;
         }
-        #clearMemory, #newSession, #receiptBtn, #apiReceiptBtn, #historyBtn, #openWishBottleChat {
+        #clearMemory, #newSession, #historyBtn, #openWishBottleChat {
             color: rgba(196,149,106,0.55); font-size: 0.72rem;
             letter-spacing: 0.08em; padding: 4px 10px;
             border: 1px solid rgba(196,149,106,0.25); border-radius: 12px;
             transition: color 0.2s, border-color 0.2s;
         }
-        #clearMemory:hover, #newSession:hover, #receiptBtn:hover, #apiReceiptBtn:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
+        #clearMemory:hover, #newSession:hover, #historyBtn:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         #modeToggle { color: rgba(196,149,106,0.55); font-size: 0.72rem; letter-spacing: 0.08em; padding: 4px 10px; border: 1px solid rgba(196,149,106,0.25); border-radius: 12px; transition: color 0.2s, border-color 0.2s, background 0.2s; }
         #modeToggle:hover { color: rgba(196,149,106,0.9); border-color: rgba(196,149,106,0.6); }
         #modeToggle.socratic-on { color: rgba(160,200,180,0.9); border-color: rgba(160,200,180,0.5); background: rgba(160,200,180,0.08); }
@@ -994,8 +994,7 @@
         <div style="display:flex;gap:8px;align-items:center;">
             <button id="openWishBottleChat" title="愿望瓶">愿望瓶</button>
             <button id="modeToggle" title="切换到深剖模式">陪伴</button>
-            <button id="apiReceiptBtn" title="生成调用小票">调用</button>
-            <button id="receiptBtn" title="生成对话小票">小票</button>
+
             <button id="newSession" title="新对话（不删除历史记录）">新对话</button>
             <button id="historyBtn" title="历史对话">历史</button>
             <button id="clearMemory" title="归档当前对话，开始新篇">清空记忆</button>
@@ -2802,72 +2801,6 @@ function showInlineMiniWish(stressLevel) {
 }
 
 // ── Receipt generation ───────────────────────────────────────────
-let receiptMode = false;
-const receiptSelected = [];
-
-document.getElementById('receiptBtn').addEventListener('click', () => {
-    if (receiptMode) { exitReceiptMode(); return; }
-    enterReceiptMode();
-});
-
-function enterReceiptMode() {
-    receiptMode = true;
-    receiptSelected.length = 0;
-    chatMsgs.classList.add('select-mode');
-    document.getElementById('receiptBtn').textContent = '取消';
-
-    // Floating bar
-    const bar = document.createElement('div');
-    bar.id = 'receiptBar';
-    bar.innerHTML = `
-        <span id="receiptCount">点击消息选择（最多3条）</span>
-        <button id="receiptGenerate" style="padding:5px 14px;border:1px solid rgba(196,149,106,0.4);border-radius:14px;background:rgba(196,149,106,0.12);color:rgba(255,220,160,0.85);font-size:0.75rem;font-family:inherit;cursor:pointer;opacity:0.4;pointer-events:none;">生成小票</button>
-    `;
-    document.body.appendChild(bar);
-
-    // 事件委托：一个监听器挂在容器上，不影响移动端滚动
-    chatMsgs._receiptDelegate = (e) => {
-        const msg = e.target.closest('.msg');
-        if (!msg) return;
-        if (receiptSelected.includes(msg)) {
-            receiptSelected.splice(receiptSelected.indexOf(msg), 1);
-            msg.classList.remove('receipt-selected');
-        } else if (receiptSelected.length < 3) {
-            receiptSelected.push(msg);
-            msg.classList.add('receipt-selected');
-        }
-        const cnt = receiptSelected.length;
-        document.getElementById('receiptCount').textContent =
-            cnt === 0 ? '点击消息选择（最多3条）' : `已选 ${cnt}/3 条`;
-        const genBtn = document.getElementById('receiptGenerate');
-        if (cnt > 0) { genBtn.style.opacity = '1'; genBtn.style.pointerEvents = 'auto'; }
-        else { genBtn.style.opacity = '0.4'; genBtn.style.pointerEvents = 'none'; }
-    };
-    chatMsgs.addEventListener('click', chatMsgs._receiptDelegate);
-
-    document.getElementById('receiptGenerate').addEventListener('click', () => {
-        if (receiptSelected.length === 0) return;
-        const receiptSnap = [...receiptSelected];
-        exitReceiptMode();
-        generateChatReceipt(receiptSnap);
-        trackEvent('receipt_generated', { count: receiptSnap.length });
-    });
-}
-
-function exitReceiptMode() {
-    receiptMode = false;
-    receiptSelected.length = 0;
-    chatMsgs.classList.remove('select-mode');
-    chatMsgs.querySelectorAll('.msg').forEach(msg => msg.classList.remove('receipt-selected'));
-    if (chatMsgs._receiptDelegate) {
-        chatMsgs.removeEventListener('click', chatMsgs._receiptDelegate);
-        delete chatMsgs._receiptDelegate;
-    }
-    document.getElementById('receiptBar')?.remove();
-    document.getElementById('receiptBtn').textContent = '小票';
-}
-
-function generateReceipt(msgEls) { generateChatReceipt(msgEls); }  // 兼容旧调用
 function _legacyReceiptUnused(msgEls) {
     const SCALE = 2, W = 360, PAD = 28, LINE = 22;
     const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -4254,7 +4187,13 @@ function renderDoneActiveSteps() {
         }
     });
 
+    const reviewBtn = document.createElement('button');
+    reviewBtn.className = 'wb-confirm-btn';
+    reviewBtn.textContent = '复盘小票 ✦';
+    reviewBtn.addEventListener('click', () => generateFeedbackReceipt());
+
     doneActions.appendChild(continueBtn);
+    doneActions.appendChild(reviewBtn);
     doneActions.appendChild(archiveBtn);
     list.appendChild(doneActions);
 }
@@ -4525,11 +4464,6 @@ document.getElementById('wbChatInput').addEventListener('keydown', e => {
 // ── 状态 ──
 let lastApiUsage = null;   // { prompt_tokens, completion_tokens, total_tokens }
 
-// ── CSS class 同步到 apiReceiptBtn ──
-const apiReceiptBtn = document.getElementById('apiReceiptBtn');
-if (apiReceiptBtn) {
-    // 与其他 header 按钮共享同一 CSS 选择器，已在 CSS 里声明
-}
 
 // ── 预览弹窗 ──
 (function buildReceiptPreviewDOM() {
@@ -4570,29 +4504,20 @@ if (apiReceiptBtn) {
 })();
 
 const RECEIPT_OPTS_DEFS = {
-    chat: {
-        title: '💬 对话小票 · 内容选择',
-        items: [
-            { key: 'showRatio',   label: '发言占比',     type: 'toggle', def: true },
-            { key: 'showQuality', label: '对话质感标签', type: 'toggle', def: true },
-            { key: 'quote', label: '精选金句', type: 'text',
-              placeholder: '留空则自动选取最长发言', def: '' },
-        ]
-    },
-    api: {
-        title: '🧾 调用小票 · 内容选择',
-        items: [
-            { key: 'showCny',   label: '人民币估算', type: 'toggle', def: true },
-            { key: 'showCum',   label: '累计消耗',   type: 'toggle', def: true },
-            { key: 'showRatio', label: '输入/输出比', type: 'toggle', def: true },
-        ]
-    },
     wish: {
         title: '✦ 愿望小票 · 内容选择',
         items: [
             { key: 'showTranslation', label: '原声→译文',  type: 'toggle', def: true },
             { key: 'showProgress',    label: '达成度进度', type: 'toggle', def: true },
             { key: 'showGoal',        label: '目标',       type: 'toggle', def: true },
+        ]
+    },
+    feedback: {
+        title: '✦ 反馈小票 · 内容选择',
+        items: [
+            { key: 'showTranslation', label: '原声→译文', type: 'toggle', def: true },
+            { key: 'reflection', label: '我的感受（留空则留出手写框）', type: 'text',
+              placeholder: '留空在小票上留出手写空间', def: '' },
         ]
     }
 };
@@ -4713,6 +4638,7 @@ function makeReceiptCanvas(sections) {
         else if (sec.type === 'progress-bar')  totalH += 20 * S;
         else if (sec.type === 'stamp')         totalH += 66 * S;
         else if (sec.type === 'barcode')       totalH += 34 * S;
+        else if (sec.type === 'writespace')    totalH += (sec.lines || 3) * 22 * S + 12 * S;
     });
     totalH += 36 * S; // bottom teeth + padding
 
@@ -4869,6 +4795,16 @@ function makeReceiptCanvas(sections) {
             ctx.restore();
             y += 66 * S;
 
+        } else if (sec.type === 'writespace') {
+            const bh = (sec.lines || 3) * 22 * S;
+            ctx.save();
+            ctx.setLineDash([3 * S, 3 * S]);
+            ctx.strokeStyle = 'rgba(40,20,5,0.28)';
+            ctx.lineWidth = S;
+            ctx.strokeRect(PAD, y + 4 * S, W - PAD * 2, bh);
+            ctx.restore();
+            y += bh + 12 * S;
+
         } else if (sec.type === 'barcode') {
             const bh = 18 * S;
             const bw = W - PAD * 2;
@@ -4915,106 +4851,7 @@ function nowStr() {
 }
 
 // ════════════════════════════════
-//  1. 对话小票
-// ════════════════════════════════
-function generateChatReceipt(msgEls, opts) {
-    if (!opts) { showReceiptOptions('chat', o => generateChatReceipt(msgEls, o)); return; }
-    const entries = msgEls.map(el => ({
-        isUser: el.classList.contains('msg-user'),
-        text: (el.innerText || el.textContent).replace(/🔊/g,'').replace(/\s+/g,' ').trim(),
-    }));
-    const userCount  = entries.filter(e => e.isUser).length;
-    const aiCount    = entries.filter(e => !e.isUser).length;
-    const userWords  = entries.filter(e => e.isUser).reduce((s,e) => s + e.text.length, 0);
-    const totalWords = entries.reduce((s,e) => s + e.text.length, 0);
-    const userRatio  = totalWords > 0 ? Math.round(userWords / totalWords * 100) : 0;
-    const avgLen     = totalWords / entries.length;
-    const depthStars = avgLen > 80 ? '★★★★☆' : avgLen > 40 ? '★★★☆☆' : '★★☆☆☆';
-    const depthLabel = avgLen > 80 ? '深度对话' : avgLen > 40 ? '较深入' : '轻松聊天';
-    const no = receiptNo('CHAT');
-
-    // 精选金句：用户手填优先，否则取最长发言
-    const longestUser = entries.filter(e => e.isUser).sort((a,b) => b.text.length - a.text.length)[0];
-    const autoQuote = longestUser ? longestUser.text : '';
-    const featuredRaw = (opts.quote || '').trim() || autoQuote;
-    // wrap at ~22 chars per line for canvas display
-    const featured = featuredRaw.slice(0, 44) + (featuredRaw.length > 44 ? '…' : '');
-
-    const sections = [
-        { type: 'spacer', h: 4 },
-        { type: 'title',    text: '💬  对话小票' },
-        { type: 'subtitle', text: `单号：${no}` },
-        { type: 'subtitle', text: nowStr() },
-        { type: 'divider' },
-        { type: 'row', key: '消息总数', val: `${entries.length} 条` },
-        { type: 'row', key: '你说了',   val: `${userCount} 条` },
-        { type: 'row', key: '灵犀说了', val: `${aiCount} 条` },
-        ...(opts.showRatio ? [{ type: 'row', key: '你的发言占比', val: `${userRatio}%`, dim: true }] : []),
-        { type: 'divider' },
-        { type: 'row', key: '深度指数', val: depthStars },
-        ...(opts.showQuality ? [{ type: 'row', key: '对话质感', val: depthLabel, dim: true }] : []),
-        { type: 'divider' },
-        { type: 'spacer', h: 6 },
-        { type: 'center', text: `"${featured.slice(0,22)}"`, size: 19, color: '#2a1608' },
-        ...(featured.length > 22 ? [{ type: 'center', text: `"${featured.slice(22)}"`, size: 19, color: '#2a1608' }] : []),
-        { type: 'spacer', h: 6 },
-        { type: 'footer', text: '── 心镜 · 对话存档 ──' },
-    ];
-    const cvs = makeReceiptCanvas(sections);
-    showReceiptPreview(cvs, `chat-${Date.now()}.png`);
-}
-
-// ════════════════════════════════
-//  2. 调用小票
-// ════════════════════════════════
-function generateApiReceipt(opts) {
-    if (!opts) { showReceiptOptions('api', o => generateApiReceipt(o)); return; }
-    const u = lastApiUsage;
-    const isDemo = !u;
-    const pt  = u?.prompt_tokens     ?? 1240;
-    const ct  = u?.completion_tokens ?? 380;
-    const tot = u?.total_tokens      ?? (pt + ct);
-    const INPUT_PRICE  = 0.27;
-    const OUTPUT_PRICE = 1.10;
-    const costUsd = (pt * INPUT_PRICE + ct * OUTPUT_PRICE) / 1_000_000;
-    const costCny = costUsd * 7.2;
-    const ratio   = ct > 0 ? (pt / ct).toFixed(1) : '—';
-    const cumKey  = 'lingxi_api_cost_cny';
-    const cumPrev = parseFloat(localStorage.getItem(cumKey) || '0');
-    const cumNew  = cumPrev + costCny;
-    if (!isDemo) localStorage.setItem(cumKey, cumNew.toFixed(6));
-    const no = receiptNo('API');
-
-    const sections = [
-        { type: 'spacer', h: 4 },
-        { type: 'title',    text: '🧾  调用小票' },
-        { type: 'subtitle', text: `单号：${no}` },
-        { type: 'subtitle', text: nowStr() },
-        { type: 'divider' },
-        { type: 'row', key: '服务商', val: 'DeepSeek' },
-        { type: 'row', key: '模型',   val: 'deepseek-chat' },
-        { type: 'divider' },
-        { type: 'row', key: '输入 tokens', val: pt.toLocaleString() },
-        { type: 'row', key: '输出 tokens', val: ct.toLocaleString() },
-        ...(opts.showRatio ? [{ type: 'row', key: '输入/输出比', val: `${ratio} : 1`, dim: true }] : []),
-        { type: 'divider' },
-        { type: 'row', key: '合计 tokens', val: tot.toLocaleString(), bold: true },
-        ...(opts.showCny ? [{ type: 'row', key: '本次费用', val: `¥ ${costCny.toFixed(4)}`, bold: true }] : [
-            { type: 'row', key: '本次费用 (USD)', val: `$${costUsd.toFixed(5)}`, bold: true },
-        ]),
-        ...(opts.showCum ? [{ type: 'row', key: '累计消耗', val: `¥ ${cumNew.toFixed(3)}`, dim: true }] : []),
-        ...(opts.showCny ? [{ type: 'row', key: '参考汇率', val: 'USD/CNY 7.2', dim: true }] : []),
-        { type: 'divider' },
-        { type: 'spacer', h: 4 },
-        { type: 'footer', text: isDemo ? '※ 无最新调用记录，展示演示数据' : '此为快照，不含税费' },
-        { type: 'footer', text: '── 心镜 · 接口账单 ──' },
-    ];
-    const cvs = makeReceiptCanvas(sections);
-    showReceiptPreview(cvs, `api-${Date.now()}.png`);
-}
-
-// ════════════════════════════════
-//  3. 愿望瓶小票
+//  1. 愿望小票
 // ════════════════════════════════
 let completedStepsTotal = parseInt(localStorage.getItem('lingxi_completed_steps') || '0');
 
@@ -5129,8 +4966,93 @@ function generateWishReceipt(stepText, opts) {
     showReceiptPreview(cvs, `wish-${Date.now()}.png`);
 }
 
-// ── 调用小票按钮 ──
-document.getElementById('apiReceiptBtn').addEventListener('click', generateApiReceipt);
+// ════════════════════════════════
+//  2. 反馈小票（复盘）
+// ════════════════════════════════
+function generateFeedbackReceipt(opts) {
+    if (!opts) { showReceiptOptions('feedback', o => generateFeedbackReceipt(o)); return; }
+
+    const no        = receiptNo('REVIEW');
+    const wishText  = wishBottleData.wish || '（未命名愿望）';
+    const direction = wishBottleData.coachingSummary || wishBottleData.chosenDirection || '';
+    const depthLabel = wishBottleData.depthLabel || '';
+    const scope     = wishBottleData.scope || {};
+    const goal      = scope.goal || '';
+    const allSteps  = wishBottleData.steps || [];
+    const doneCount = allSteps.filter(s => s.status === 'done').length;
+    const depth     = wishBottleData.depth || '';
+
+    // 历时（天）
+    const startedAt = wishBottleData.startedAt || Date.now();
+    const days      = Math.max(1, Math.round((Date.now() - startedAt) / 86400000));
+
+    // 稀有度（复用愿望小票逻辑）
+    let rarity, rarityStars;
+    if (depth === 'long' && doneCount >= 3) { rarity = 'SSR'; rarityStars = '★★★'; }
+    else if (depth === 'long' || doneCount >= 2) { rarity = 'SR'; rarityStars = '★★☆'; }
+    else { rarity = 'R'; rarityStars = '★☆☆'; }
+
+    // 励志语（按稀有度）
+    const wisdomPool = {
+        SSR: ['你完成的每一步，都是真实的。', '把困难翻译成行动，你已经做到了。'],
+        SR:  ['这段旅程留下的，比你意识到的更多。', '带走你走过的这段路。'],
+        R:   ['迈出来的，就不会消失。', '一小步，也是向前。'],
+    };
+    const wisdom = wisdomPool[rarity][Math.floor(Math.random() * wisdomPool[rarity].length)];
+
+    const reflection = (opts.reflection || '').trim();
+
+    const sections = [
+        { type: 'spacer', h: 4 },
+        { type: 'title', text: '✦ 灵犀翻译 · 愿望复盘 ✦' },
+        { type: 'subtitle', text: no },
+        { type: 'subtitle', text: nowStr() },
+        { type: 'divider' },
+
+        { type: 'subtitle', text: '── 这段旅程 ──' },
+        { type: 'spacer', h: 3 },
+        { type: 'center', text: `「${wishText.slice(0,22)}${wishText.length>22?'…」':'」'}`, size: 20, bold: true },
+        { type: 'spacer', h: 4 },
+
+        ...(opts.showTranslation && direction ? [
+            { type: 'row', key: '原声', val: wishText.slice(0,14)+(wishText.length>14?'…':'') },
+            { type: 'row', key: '译文', val: direction.slice(0,14)+(direction.length>14?'…':'') },
+            { type: 'spacer', h: 2 },
+        ] : []),
+
+        ...(goal ? [
+            { type: 'row', key: depthLabel || '目标', val: goal.slice(0,16)+(goal.length>16?'…':''), dim: true },
+            { type: 'spacer', h: 2 },
+        ] : []),
+
+        { type: 'divider' },
+        { type: 'subtitle', text: '── 走过的路 ──' },
+        { type: 'spacer', h: 2 },
+        { type: 'row', key: '完成步骤', val: `${doneCount} 个` },
+        { type: 'row', key: '历时',     val: `${days} 天` },
+        { type: 'row', key: '稀有度',   val: `${rarity}  ${rarityStars}` },
+        { type: 'spacer', h: 4 },
+
+        { type: 'divider' },
+        { type: 'subtitle', text: '── 我的感受 ──' },
+        { type: 'spacer', h: 3 },
+        ...(reflection
+            ? reflection.match(/.{1,22}/g).map(line => ({ type: 'center', text: line, size: 18, color: '#2a1608' }))
+            : [{ type: 'writespace', lines: 3 }]
+        ),
+        { type: 'spacer', h: 6 },
+
+        { type: 'divider' },
+        { type: 'footer', text: `"${wisdom}"` },
+        { type: 'spacer', h: 4 },
+        { type: 'stamp', text: 'PASSED', right: true },
+        { type: 'barcode', code: no },
+        { type: 'spacer', h: 4 },
+    ];
+
+    const cvs = makeReceiptCanvas(sections);
+    showReceiptPreview(cvs, `feedback-${Date.now()}.png`);
+}
 
 // ══════════════════════════════════════════════════
 //  步骤反馈 & 用户画像刷新
