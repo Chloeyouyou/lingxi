@@ -4505,12 +4505,12 @@ function makeReceiptCanvas(sections) {
     function lineH(size) { return Math.round(size * S * 1.55); }
     let totalH = 28 * S; // top teeth
     sections.forEach(sec => {
-        if (sec.type === 'title')    totalH += lineH(16) + 4 * S;
-        else if (sec.type === 'subtitle') totalH += lineH(9);
+        if (sec.type === 'title')    totalH += lineH(18) + 4 * S;
+        else if (sec.type === 'subtitle') totalH += lineH(13);
         else if (sec.type === 'divider')  totalH += 18 * S;
-        else if (sec.type === 'row')      totalH += lineH(10);
-        else if (sec.type === 'indent')   totalH += lineH(9.5);
-        else if (sec.type === 'footer')   totalH += lineH(9) + 4 * S;
+        else if (sec.type === 'row')      totalH += lineH(13);
+        else if (sec.type === 'indent')   totalH += lineH(13);
+        else if (sec.type === 'footer')   totalH += lineH(13) + 4 * S;
         else if (sec.type === 'spacer')   totalH += (sec.h || 8) * S;
     });
     totalH += 36 * S; // bottom teeth + padding
@@ -4544,23 +4544,23 @@ function makeReceiptCanvas(sections) {
     sections.forEach(sec => {
         ctx.textBaseline = 'alphabetic';
         if (sec.type === 'title') {
-            ctx.font = `400 ${16 * S}px 'Noto Serif SC', serif`;
+            ctx.font = `400 ${18 * S}px 'Noto Serif SC', serif`;
             ctx.fillStyle = '#1a0e06';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 16 * S); y += lineH(16) + 4 * S;
+            ctx.fillText(sec.text, W / 2, y + 18 * S); y += lineH(18) + 4 * S;
 
         } else if (sec.type === 'subtitle') {
-            ctx.font = `400 ${9 * S}px 'SF Mono', 'Courier New', monospace`;
+            ctx.font = `400 ${13 * S}px 'SF Mono', 'Courier New', monospace`;
             ctx.fillStyle = '#4a3520';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9);
+            ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13);
 
         } else if (sec.type === 'divider') {
             dash(y + 8 * S); y += 18 * S;
 
         } else if (sec.type === 'row') {
-            const fs = sec.bold ? 10.5 : 10;
-            ctx.font = `${sec.bold ? '500' : '400'} ${fs * S}px 'SF Mono', 'Courier New', monospace`;
+            const fs = sec.bold ? 14 : 13;
+            ctx.font = `${sec.bold ? '600' : '400'} ${fs * S}px 'SF Mono', 'Courier New', monospace`;
             ctx.fillStyle = sec.dim ? '#6a4828' : '#2a1608';
             // key left
             ctx.textAlign = 'left';
@@ -4575,7 +4575,7 @@ function makeReceiptCanvas(sections) {
             if (dotsArea > 0) {
                 ctx.fillStyle = 'rgba(40,20,5,0.35)';
                 const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
-                ctx.font = `400 ${8 * S}px 'SF Mono', monospace`;
+                ctx.font = `400 ${11 * S}px 'SF Mono', monospace`;
                 ctx.textAlign = 'left';
                 // clip dots to available space
                 let dots = '';
@@ -4588,16 +4588,16 @@ function makeReceiptCanvas(sections) {
             y += lineH(fs);
 
         } else if (sec.type === 'indent') {
-            ctx.font = `400 ${9.5 * S}px 'SF Mono', 'Courier New', monospace`;
+            ctx.font = `400 ${13 * S}px 'SF Mono', 'Courier New', monospace`;
             ctx.fillStyle = '#2a1608';
             ctx.textAlign = 'left';
-            ctx.fillText(sec.text, PAD + 12 * S, y + 9.5 * S); y += lineH(9.5);
+            ctx.fillText(sec.text, PAD + 12 * S, y + 13 * S); y += lineH(13);
 
         } else if (sec.type === 'footer') {
-            ctx.font = `400 ${9 * S}px 'Noto Serif SC', serif`;
+            ctx.font = `400 ${13 * S}px 'Noto Serif SC', serif`;
             ctx.fillStyle = '#6a4828';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9) + 4 * S;
+            ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13) + 4 * S;
 
         } else if (sec.type === 'spacer') {
             y += (sec.h || 8) * S;
