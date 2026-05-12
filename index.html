@@ -4491,7 +4491,7 @@ function showReceiptPreview(canvas, filename) {
 }
 
 // ── 公共绘制工具 ──
-const RECEIPT_W = 360, RECEIPT_SCALE = 2, RECEIPT_PAD = 24;
+const RECEIPT_W = 360, RECEIPT_SCALE = 3, RECEIPT_PAD = 24;
 
 function makeReceiptCanvas(sections) {
     // sections: array of { type, ...props }
@@ -4534,7 +4534,7 @@ function makeReceiptCanvas(sections) {
     function dash(yy) {
         ctx.save();
         ctx.setLineDash([4 * S, 5 * S]);
-        ctx.strokeStyle = 'rgba(80,50,20,0.18)';
+        ctx.strokeStyle = 'rgba(40,20,5,0.3)';
         ctx.lineWidth = S;
         ctx.beginPath();
         ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy);
@@ -4551,7 +4551,7 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'subtitle') {
             ctx.font = `400 ${9 * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = '#7a5c3e';
+            ctx.fillStyle = '#4a3520';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9);
 
@@ -4561,7 +4561,7 @@ function makeReceiptCanvas(sections) {
         } else if (sec.type === 'row') {
             const fs = sec.bold ? 10.5 : 10;
             ctx.font = `${sec.bold ? '500' : '400'} ${fs * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = sec.dim ? '#a08060' : '#2a1608';
+            ctx.fillStyle = sec.dim ? '#6a4828' : '#2a1608';
             // key left
             ctx.textAlign = 'left';
             ctx.fillText(sec.key, PAD, y + fs * S);
@@ -4573,7 +4573,7 @@ function makeReceiptCanvas(sections) {
             const valW = ctx.measureText(sec.val).width;
             const dotsArea = W - PAD * 2 - keyW - valW - 8 * S;
             if (dotsArea > 0) {
-                ctx.fillStyle = 'rgba(80,50,20,0.22)';
+                ctx.fillStyle = 'rgba(40,20,5,0.35)';
                 const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
                 ctx.font = `400 ${8 * S}px 'SF Mono', monospace`;
                 ctx.textAlign = 'left';
@@ -4589,13 +4589,13 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'indent') {
             ctx.font = `400 ${9.5 * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = '#5a3c22';
+            ctx.fillStyle = '#2a1608';
             ctx.textAlign = 'left';
             ctx.fillText(sec.text, PAD + 12 * S, y + 9.5 * S); y += lineH(9.5);
 
         } else if (sec.type === 'footer') {
             ctx.font = `400 ${9 * S}px 'Noto Serif SC', serif`;
-            ctx.fillStyle = '#9a7050';
+            ctx.fillStyle = '#6a4828';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 9 * S); y += lineH(9) + 4 * S;
 
