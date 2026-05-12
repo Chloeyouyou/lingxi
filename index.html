@@ -4567,8 +4567,9 @@ const RECEIPT_OPTS_DEFS = {
     wish: {
         title: '✦ 愿望小票 · 内容选择',
         items: [
-            { key: 'showIntent', label: '核心意图', type: 'toggle', def: true },
-            { key: 'showGoal',   label: '目标',     type: 'toggle', def: true },
+            { key: 'showTranslation', label: '原声→译文',  type: 'toggle', def: true },
+            { key: 'showProgress',    label: '达成度进度', type: 'toggle', def: true },
+            { key: 'showGoal',        label: '目标',       type: 'toggle', def: true },
         ]
     }
 };
@@ -4673,8 +4674,12 @@ function makeReceiptCanvas(sections) {
         else if (sec.type === 'divider')  totalH += 16 * S;
         else if (sec.type === 'row')      totalH += lineH(19);
         else if (sec.type === 'indent')   totalH += lineH(19);
-        else if (sec.type === 'footer')   totalH += lineH(19) + 4 * S;
-        else if (sec.type === 'spacer')   totalH += (sec.h || 8) * S;
+        else if (sec.type === 'footer')        totalH += lineH(19) + 4 * S;
+        else if (sec.type === 'spacer')        totalH += (sec.h || 8) * S;
+        else if (sec.type === 'progress-dots') totalH += 14 * S;
+        else if (sec.type === 'progress-bar')  totalH += 20 * S;
+        else if (sec.type === 'stamp')         totalH += 66 * S;
+        else if (sec.type === 'barcode')       totalH += 34 * S;
     });
     totalH += 36 * S; // bottom teeth + padding
 
@@ -4772,6 +4777,88 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'spacer') {
             y += (sec.h || 8) * S;
+
+        } else if (sec.type === 'progress-dots') {
+            const total = Math.max(1, sec.total || 5);
+            const done  = Math.min(sec.done || 0, total);
+            const dotR  = 4 * S;
+            const gap   = 11 * S;
+            const rowW  = (total - 1) * gap + dotR * 2;
+            const startX = (W - rowW) / 2 + dotR;
+            for (let i = 0; i < total; i++) {
+                ctx.beginPath();
+                ctx.arc(startX + i * gap, y + dotR, dotR, 0, Math.PI * 2);
+                if (i < done) {
+                    ctx.fillStyle = 'rgba(196,149,106,0.85)';
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = 'rgba(196,149,106,0.22)';
+                    ctx.fill();
+                }
+            }
+            y += dotR * 2 + 6 * S;
+
+        } else if (sec.type === 'progress-bar') {
+            const total  = sec.total || 10;
+            const filled = Math.min(sec.filled || 0, total);
+            const bh     = 11 * S;
+            const innerW = W - PAD * 2 - 4 * S;
+            const cellW  = innerW / total;
+            // brackets
+            ctx.fillStyle = '#2a1608';
+            ctx.fillRect(PAD, y + 2 * S, 2 * S, bh);
+            ctx.fillRect(W - PAD - 2 * S, y + 2 * S, 2 * S, bh);
+            for (let i = 0; i < total; i++) {
+                const bx = PAD + 2 * S + i * cellW;
+                ctx.fillStyle = i < filled ? 'rgba(196,149,106,0.82)' : 'rgba(196,149,106,0.14)';
+                ctx.fillRect(bx + S, y + 3 * S, cellW - 2 * S, bh - 2 * S);
+            }
+            y += bh + 8 * S;
+
+        } else if (sec.type === 'stamp') {
+            ctx.save();
+            const cx = sec.right ? W * 0.68 : W / 2;
+            const cy  = y + 32 * S;
+            ctx.translate(cx, cy);
+            ctx.rotate(-11 * Math.PI / 180);
+            const rx = 52 * S, ry = 25 * S;
+            ctx.strokeStyle = 'rgba(155,40,40,0.52)';
+            ctx.lineWidth = 2 * S;
+            ctx.setLineDash([3 * S, 2 * S]);
+            ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.lineWidth = S;
+            ctx.beginPath(); ctx.ellipse(0, 0, rx - 5 * S, ry - 5 * S, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.font = `700 ${17 * S}px 'Courier New', monospace`;
+            ctx.fillStyle = 'rgba(155,40,40,0.52)';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(sec.text || 'PASSED', 0, 0);
+            ctx.restore();
+            y += 66 * S;
+
+        } else if (sec.type === 'barcode') {
+            const bh = 18 * S;
+            const bw = W - PAD * 2;
+            const n  = 58;
+            const uw = bw / n;
+            // hash from code string
+            let h = 0;
+            for (let i = 0; i < (sec.code || '').length; i++) {
+                h = Math.imul(h ^ (sec.code.charCodeAt(i)), 0x9e3779b9);
+            }
+            ctx.fillStyle = '#1a0e06';
+            for (let i = 0; i < n; i++) {
+                h = Math.imul(h ^ (h >>> 16), 0x45d9f3b); h ^= h >>> 15;
+                if ((h & 3) !== 0) {
+                    const thick = (h & 7) < 2;
+                    ctx.fillRect(PAD + i * uw, y, thick ? uw * 1.6 : uw * 0.85, bh);
+                }
+            }
+            ctx.font = `400 ${9 * S}px 'Courier New', monospace`;
+            ctx.fillStyle = '#5a3c22';
+            ctx.textAlign = 'center';
+            ctx.fillText(sec.code || '', W / 2, y + bh + 8 * S);
+            y += bh + 14 * S;
         }
     });
 
@@ -4900,48 +4987,109 @@ function generateWishReceipt(stepText, opts) {
     if (!opts) { showReceiptOptions('wish', o => generateWishReceipt(stepText, o)); return; }
     completedStepsTotal++;
     localStorage.setItem('lingxi_completed_steps', String(completedStepsTotal));
-    const no = receiptNo('WISH');
-    const encouragements = [
-        '一小步，也是向前。', '做到了，就是做到了。', '迈出来的，就不会消失。',
-        '你比你以为的更有力量。', '每一步都算数。',
-    ];
-    const enc = encouragements[Math.floor(Math.random() * encouragements.length)];
-    const wishText = wishBottleData.wish || '（未命名愿望）';
+
+    const no        = receiptNo('WISH');
+    const wishText  = wishBottleData.wish || '（未命名愿望）';
     const direction = wishBottleData.coachingSummary || wishBottleData.chosenDirection || '';
     const depthLabel = wishBottleData.depthLabel || '';
-    const scope = wishBottleData.scope || {};
-    const goal = scope.goal || '';
+    const scope     = wishBottleData.scope || {};
+    const goal      = scope.goal || '';
+
+    // 达成度
+    const allSteps   = wishBottleData.steps || [];
+    const doneCount  = allSteps.filter(s => s.status === 'done').length;
+    const totalCount = Math.max(allSteps.length, 1);
+    const dotTotal   = Math.min(totalCount, 10);
+    const dotDone    = Math.min(doneCount, dotTotal);
+
+    // 能量进度（累计步骤 → 格子数，上限10）
+    const filledBars = Math.min(10, completedStepsTotal);
+    const energyPct  = Math.round(filledBars * 10);
+
+    // 稀有度
+    const depth = wishBottleData.depth || '';
+    let rarity, rarityStars;
+    if (depth === 'long' && doneCount >= 3) { rarity = 'SSR'; rarityStars = '★★★'; }
+    else if (depth === 'long' || doneCount >= 2) { rarity = 'SR'; rarityStars = '★★☆'; }
+    else { rarity = 'R'; rarityStars = '★☆☆'; }
+
+    // 译者注（按稀有度分组，随机）
+    const wisdomPool = {
+        SSR: ['你走过的每一步，都在构建更大的自己。', '把困难翻译成行动，这需要极大的勇气。', '此处用户展现出了惊人的心理韧性。'],
+        SR:  ['愿望不是终点，而是你迈出第一步的理由。', '把情绪翻译成行动，你做到了。', '灵犀注：用户正在稳定地向前推进。'],
+        R:   ['一小步，也是向前。', '做到了，就是做到了。迈出来的不会消失。', '灵犀注：每一次完成都值得被记录下来。'],
+    };
+    const pool = wisdomPool[rarity];
+    const wisdom = pool[Math.floor(Math.random() * pool.length)];
+
+    const timeStr = new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' });
 
     const sections = [
         { type: 'spacer', h: 4 },
-        { type: 'title',    text: '✦  愿望小票  ✦' },
-        { type: 'subtitle', text: `单号：${no}` },
+        { type: 'title', text: '✦ 灵犀翻译 · 愿望归档 ✦' },
+        { type: 'subtitle', text: no },
         { type: 'subtitle', text: nowStr() },
         { type: 'divider' },
-        { type: 'spacer', h: 6 },
-        { type: 'center', text: `「${wishText.slice(0, 22)}${wishText.length > 22 ? '…」' : '」'}`, size: 20, bold: true },
-        ...(opts.showIntent && direction ? [
-            { type: 'spacer', h: 4 },
-            { type: 'center', text: direction.slice(0, 26) + (direction.length > 26 ? '…' : ''), size: 17, color: '#7a5c3e' },
-        ] : []),
-        ...(opts.showGoal && goal ? [
-            { type: 'spacer', h: 2 },
-            { type: 'row', key: depthLabel || '目标', val: goal.slice(0, 16) + (goal.length > 16 ? '…' : ''), dim: true },
-        ] : []),
-        { type: 'spacer', h: 6 },
-        { type: 'divider' },
-        { type: 'subtitle', text: '── 完成了 ──' },
-        { type: 'spacer', h: 2 },
-        { type: 'center', text: stepText.slice(0, 26) + (stepText.length > 26 ? '…' : ''), size: 19 },
-        { type: 'spacer', h: 6 },
-        { type: 'divider' },
-        { type: 'row', key: '完成时间', val: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }) },
-        { type: 'row', key: '累计完成步骤', val: `${completedStepsTotal} 个`, bold: true },
-        { type: 'divider' },
+
+        // 任务核心
+        { type: 'subtitle', text: '── 任务核心 ──' },
+        { type: 'spacer', h: 3 },
+        { type: 'center', text: `「${wishText.slice(0,22)}${wishText.length>22?'…」':'」'}`, size: 20, bold: true },
         { type: 'spacer', h: 4 },
-        { type: 'footer', text: `"${enc}"` },
-        { type: 'footer', text: '── 心镜 · 愿望存档 ──' },
+
+        // 过程记录（原声→译文）
+        ...(opts.showTranslation && direction ? [
+            { type: 'divider' },
+            { type: 'subtitle', text: '── 过程记录 ──' },
+            { type: 'row', key: '原声', val: wishText.slice(0,14)+(wishText.length>14?'…':'') },
+            { type: 'row', key: '译文', val: direction.slice(0,14)+(direction.length>14?'…':'') },
+            { type: 'spacer', h: 2 },
+        ] : []),
+
+        // 目标
+        ...(opts.showGoal && goal ? [
+            { type: 'row', key: depthLabel || '目标', val: goal.slice(0,16)+(goal.length>16?'…':''), dim: true },
+            { type: 'spacer', h: 2 },
+        ] : []),
+
+        { type: 'divider' },
+
+        // 本次完成
+        { type: 'subtitle', text: '── 本次完成 ──' },
+        { type: 'spacer', h: 3 },
+        { type: 'center', text: stepText.slice(0,26)+(stepText.length>26?'…':''), size: 19 },
+        { type: 'spacer', h: 6 },
+
+        { type: 'divider' },
+
+        // 达成度 & 能量
+        ...(opts.showProgress ? [
+            { type: 'row', key: '达成度', val: `${dotDone} / ${dotTotal}` },
+            { type: 'progress-dots', done: dotDone, total: dotTotal },
+            { type: 'spacer', h: 4 },
+            { type: 'row', key: '能量积累', val: `${energyPct}%` },
+            { type: 'progress-bar', filled: filledBars, total: 10 },
+            { type: 'spacer', h: 4 },
+        ] : []),
+
+        { type: 'row', key: '稀有度', val: `${rarity}  ${rarityStars}` },
+        { type: 'divider' },
+
+        // 译者注
+        { type: 'subtitle', text: '── 译者注 ──' },
+        { type: 'spacer', h: 3 },
+        { type: 'footer', text: wisdom },
+        { type: 'spacer', h: 4 },
+
+        { type: 'row', key: '完成时间', val: timeStr },
+        { type: 'row', key: '累计步骤', val: `${completedStepsTotal} 个`, bold: true },
+
+        { type: 'divider' },
+        { type: 'stamp', text: 'PASSED', right: true },
+        { type: 'barcode', code: no },
+        { type: 'spacer', h: 4 },
     ];
+
     const cvs = makeReceiptCanvas(sections);
     showReceiptPreview(cvs, `wish-${Date.now()}.png`);
 }
