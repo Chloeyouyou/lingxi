@@ -2837,9 +2837,10 @@ function enterReceiptMode() {
 
     document.getElementById('receiptGenerate').addEventListener('click', () => {
         if (receiptSelected.length === 0) return;
+        const receiptSnap = [...receiptSelected];
         exitReceiptMode();
-        generateChatReceipt(receiptSelected);
-        trackEvent('receipt_generated', { count: receiptSelected.length });
+        generateChatReceipt(receiptSnap);
+        trackEvent('receipt_generated', { count: receiptSnap.length });
     });
 }
 
@@ -4668,6 +4669,7 @@ function makeReceiptCanvas(sections) {
     sections.forEach(sec => {
         if (sec.type === 'title')    totalH += lineH(27) + 4 * S;
         else if (sec.type === 'subtitle') totalH += lineH(19);
+        else if (sec.type === 'center')   totalH += lineH(sec.size || 20) + (sec.gap || 0) * S;
         else if (sec.type === 'divider')  totalH += 16 * S;
         else if (sec.type === 'row')      totalH += lineH(19);
         else if (sec.type === 'indent')   totalH += lineH(19);
@@ -4715,6 +4717,14 @@ function makeReceiptCanvas(sections) {
             ctx.fillStyle = '#7a5c3e';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 19 * S); y += lineH(19);
+
+        } else if (sec.type === 'center') {
+            const fs = sec.size || 20;
+            ctx.font = `${sec.bold ? '600' : '400'} ${fs * S}px 'Noto Serif SC', serif`;
+            ctx.fillStyle = sec.color || '#2a1608';
+            ctx.textAlign = 'center';
+            ctx.fillText(sec.text, W / 2, y + fs * S);
+            y += lineH(fs) + (sec.gap || 0) * S;
 
         } else if (sec.type === 'divider') {
             dash(y + 8 * S); y += 16 * S;
@@ -4908,19 +4918,22 @@ function generateWishReceipt(stepText, opts) {
         { type: 'subtitle', text: `单号：${no}` },
         { type: 'subtitle', text: nowStr() },
         { type: 'divider' },
-        { type: 'row',    key: '愿望', val: '' },
-        { type: 'indent', text: wishText.slice(0, 28) + (wishText.length > 28 ? '…' : '') },
+        { type: 'spacer', h: 6 },
+        { type: 'center', text: `「${wishText.slice(0, 22)}${wishText.length > 22 ? '…」' : '」'}`, size: 20, bold: true },
         ...(opts.showIntent && direction ? [
-            { type: 'spacer', h: 3 },
-            { type: 'row',    key: '核心意图', val: '' },
-            { type: 'indent', text: direction.slice(0, 28) + (direction.length > 28 ? '…' : '') },
+            { type: 'spacer', h: 4 },
+            { type: 'center', text: direction.slice(0, 26) + (direction.length > 26 ? '…' : ''), size: 17, color: '#7a5c3e' },
         ] : []),
         ...(opts.showGoal && goal ? [
-            { type: 'row', key: depthLabel || '目标', val: goal.slice(0, 18) + (goal.length > 18 ? '…' : '') },
+            { type: 'spacer', h: 2 },
+            { type: 'row', key: depthLabel || '目标', val: goal.slice(0, 16) + (goal.length > 16 ? '…' : ''), dim: true },
         ] : []),
-        { type: 'spacer', h: 3 },
-        { type: 'row',    key: '完成步骤', val: '' },
-        { type: 'indent', text: stepText.slice(0, 30) + (stepText.length > 30 ? '…' : '') },
+        { type: 'spacer', h: 6 },
+        { type: 'divider' },
+        { type: 'subtitle', text: '── 完成了 ──' },
+        { type: 'spacer', h: 2 },
+        { type: 'center', text: stepText.slice(0, 26) + (stepText.length > 26 ? '…' : ''), size: 19 },
+        { type: 'spacer', h: 6 },
         { type: 'divider' },
         { type: 'row', key: '完成时间', val: new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' }) },
         { type: 'row', key: '累计完成步骤', val: `${completedStepsTotal} 个`, bold: true },
