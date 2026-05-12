@@ -4518,12 +4518,12 @@ function makeReceiptCanvas(sections) {
     cvs.height = totalH;
 
     // ── 背景 ──
-    ctx.fillStyle = '#f7f4ef';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, totalH);
 
     // ── 锯齿撕边（顶部）──
     const teeth = 14, tw = W / teeth;
-    ctx.fillStyle = '#f7f4ef';
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.moveTo(0, -4);
     for (let i = 0; i <= teeth; i++) ctx.lineTo(i * tw, i % 2 === 0 ? 0 : 13 * S);
@@ -4534,7 +4534,7 @@ function makeReceiptCanvas(sections) {
     function dash(yy) {
         ctx.save();
         ctx.setLineDash([4 * S, 5 * S]);
-        ctx.strokeStyle = 'rgba(40,20,5,0.3)';
+        ctx.strokeStyle = '#aaaaaa';
         ctx.lineWidth = S;
         ctx.beginPath();
         ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy);
@@ -4544,14 +4544,14 @@ function makeReceiptCanvas(sections) {
     sections.forEach(sec => {
         ctx.textBaseline = 'alphabetic';
         if (sec.type === 'title') {
-            ctx.font = `400 ${18 * S}px 'Noto Serif SC', serif`;
-            ctx.fillStyle = '#1a0e06';
+            ctx.font = `600 ${18 * S}px 'Noto Serif SC', serif`;
+            ctx.fillStyle = '#000000';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 18 * S); y += lineH(18) + 4 * S;
 
         } else if (sec.type === 'subtitle') {
-            ctx.font = `400 ${13 * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = '#4a3520';
+            ctx.font = `400 ${13 * S}px 'Courier New', monospace`;
+            ctx.fillStyle = '#333333';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13);
 
@@ -4560,8 +4560,8 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'row') {
             const fs = sec.bold ? 14 : 13;
-            ctx.font = `${sec.bold ? '600' : '400'} ${fs * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = sec.dim ? '#6a4828' : '#2a1608';
+            ctx.font = `${sec.bold ? '700' : '400'} ${fs * S}px 'Courier New', monospace`;
+            ctx.fillStyle = sec.dim ? '#555555' : '#111111';
             // key left
             ctx.textAlign = 'left';
             ctx.fillText(sec.key, PAD, y + fs * S);
@@ -4573,9 +4573,9 @@ function makeReceiptCanvas(sections) {
             const valW = ctx.measureText(sec.val).width;
             const dotsArea = W - PAD * 2 - keyW - valW - 8 * S;
             if (dotsArea > 0) {
-                ctx.fillStyle = 'rgba(40,20,5,0.35)';
+                ctx.fillStyle = '#aaaaaa';
                 const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
-                ctx.font = `400 ${11 * S}px 'SF Mono', monospace`;
+                ctx.font = `400 ${11 * S}px 'Courier New', monospace`;
                 ctx.textAlign = 'left';
                 // clip dots to available space
                 let dots = '';
@@ -4588,14 +4588,14 @@ function makeReceiptCanvas(sections) {
             y += lineH(fs);
 
         } else if (sec.type === 'indent') {
-            ctx.font = `400 ${13 * S}px 'SF Mono', 'Courier New', monospace`;
-            ctx.fillStyle = '#2a1608';
+            ctx.font = `400 ${13 * S}px 'Courier New', monospace`;
+            ctx.fillStyle = '#222222';
             ctx.textAlign = 'left';
             ctx.fillText(sec.text, PAD + 12 * S, y + 13 * S); y += lineH(13);
 
         } else if (sec.type === 'footer') {
             ctx.font = `400 ${13 * S}px 'Noto Serif SC', serif`;
-            ctx.fillStyle = '#6a4828';
+            ctx.fillStyle = '#444444';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13) + 4 * S;
 
@@ -4605,7 +4605,7 @@ function makeReceiptCanvas(sections) {
     });
 
     // ── 锯齿撕边（底部）──
-    ctx.fillStyle = '#f7f4ef';
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.moveTo(0, totalH + 4);
     for (let i = 0; i <= teeth; i++) ctx.lineTo(i * tw, totalH - (i % 2 === 0 ? 0 : 13 * S));
