@@ -359,18 +359,18 @@ async function handleRequest(request, env, origin) {
 
                     // POST /db/wish/session/save
                     if (url.pathname === '/db/wish/session/save') {
-                        const { wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, steps_json, created_at, ended_at } = body;
+                        const { wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, chat_json, steps_json, created_at, ended_at } = body;
                         if (!wish_text) return jsonErr(cors(origin), 400, 'Missing wish_text');
                         await env.DB.prepare(
-                            'INSERT INTO wish_sessions (user_id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, steps_json, created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                        ).bind(user_id, wish_text, direction || '', scope_json || '{}', depth || '', depth_label || '', steps_done || 0, avoid_types || '[]', coaching_json || '[]', steps_json || '[]', created_at || Date.now(), ended_at || Date.now()).run();
+                            'INSERT INTO wish_sessions (user_id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, chat_json, steps_json, created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                        ).bind(user_id, wish_text, direction || '', scope_json || '{}', depth || '', depth_label || '', steps_done || 0, avoid_types || '[]', coaching_json || '[]', chat_json || '[]', steps_json || '[]', created_at || Date.now(), ended_at || Date.now()).run();
                         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: h });
                     }
 
                     // POST /db/wish/session/list
                     if (url.pathname === '/db/wish/session/list') {
                         const result = await env.DB.prepare(
-                            'SELECT id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, steps_json, created_at, ended_at FROM wish_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 30'
+                            'SELECT id, wish_text, direction, scope_json, depth, depth_label, steps_done, avoid_types, coaching_json, chat_json, steps_json, created_at, ended_at FROM wish_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 30'
                         ).bind(user_id).all();
                         return new Response(JSON.stringify({ sessions: result.results || [] }), { status: 200, headers: h });
                     }
@@ -534,6 +534,7 @@ async function ensureWishSessionTable(db) {
             steps_done  INTEGER DEFAULT 0,
             avoid_types TEXT    DEFAULT '[]',
             coaching_json TEXT  DEFAULT '[]',
+            chat_json   TEXT    DEFAULT '[]',
             steps_json  TEXT    DEFAULT '[]',
             created_at  INTEGER NOT NULL,
             ended_at    INTEGER
@@ -542,6 +543,7 @@ async function ensureWishSessionTable(db) {
     ]);
     // 兼容旧表：补上新列（已存在时会报错，用 try/catch 忽略）
     try { await db.prepare('ALTER TABLE wish_sessions ADD COLUMN coaching_json TEXT DEFAULT \'[]\'').run(); } catch (_) {}
+    try { await db.prepare('ALTER TABLE wish_sessions ADD COLUMN chat_json TEXT DEFAULT \'[]\'').run(); } catch (_) {}
     try { await db.prepare('ALTER TABLE wish_sessions ADD COLUMN steps_json TEXT DEFAULT \'[]\'').run(); } catch (_) {}
 
 }

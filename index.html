@@ -5118,6 +5118,7 @@ async function dbWishSessionSave() {
             steps_json: JSON.stringify(wishBottleData.steps.map(s => ({ text: s.text, status: s.status }))),
             avoid_types: JSON.stringify(avoidTypes),
             coaching_json: JSON.stringify(wishBottleData.coachingHistory || []),
+            chat_json: JSON.stringify(wishBottleData.chatHistory || []),
             created_at: wishBottleData.startedAt || Date.now(),
             ended_at: Date.now()
         })
@@ -5261,6 +5262,8 @@ function loadWishFromArchive(session) {
     try { scope = JSON.parse(session.scope_json || '{}'); } catch { scope = {}; }
     let coachingHistory = [];
     try { coachingHistory = JSON.parse(session.coaching_json || '[]'); } catch { coachingHistory = []; }
+    let chatHistory = [];
+    try { chatHistory = JSON.parse(session.chat_json || '[]'); } catch { chatHistory = []; }
     wishBottleData = {
         wish: session.wish_text || '',
         chosenDirection: session.direction || '',
@@ -5271,7 +5274,7 @@ function loadWishFromArchive(session) {
         phase: 'scoping',
         depth: session.depth || '',
         depthLabel: session.depth_label || '',
-        chatHistory: [],
+        chatHistory: chatHistory,
         startedAt: Date.now(),
         _directions: []
     };
