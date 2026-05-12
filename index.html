@@ -4345,10 +4345,22 @@ async function callWishChat(userMsg) {
         : '';
     const dirBlock = wishBottleData.chosenDirection ? `\n用户选定的方向：${wishBottleData.chosenDirection}` : '';
 
+    const coachingSnippet = (() => {
+        const h = wishBottleData.coachingHistory || [];
+        if (!h.length) return '';
+        // 取前6轮（用户说的话更重要，AI的回复截短）
+        const lines = h.slice(0, 6).map(m => {
+            const role = m.role === 'ai' ? '灵犀' : '用户';
+            const content = m.role === 'ai' ? m.content.slice(0, 60) + (m.content.length > 60 ? '…' : '') : m.content;
+            return `${role}：${content}`;
+        }).join('\n');
+        return `\n\n── 用户在深度对话中说过的话（了解背景用，不要主动提起） ──\n${lines}`;
+    })();
+
     const wishContext = `
 ──── 愿望瓶上下文（仅供参考，不要主动提起，除非用户说到） ────
 用户正在通过愿望瓶处理一个愿望："${wishBottleData.wish}"
-类型：${wishBottleData.depth === 'short' ? '短期释放' : '长期目标'}${dirBlock}${scopeBlock}
+类型：${wishBottleData.depth === 'short' ? '短期释放' : '长期目标'}${dirBlock}${scopeBlock}${coachingSnippet}
 当前步骤：
 ${stepsSummary}
 
