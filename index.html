@@ -4491,7 +4491,7 @@ function showReceiptPreview(canvas, filename) {
 }
 
 // ── 公共绘制工具 ──
-const RECEIPT_W = 360, RECEIPT_SCALE = 3, RECEIPT_PAD = 24;
+const RECEIPT_W = 400, RECEIPT_SCALE = 3, RECEIPT_PAD = 28;
 
 function makeReceiptCanvas(sections) {
     // sections: array of { type, ...props }
@@ -4502,15 +4502,15 @@ function makeReceiptCanvas(sections) {
     const ctx = cvs.getContext('2d');
 
     // ── 预先测高 ──
-    function lineH(size) { return Math.round(size * S * 1.55); }
+    function lineH(size) { return Math.round(size * S * 1.8); }
     let totalH = 28 * S; // top teeth
     sections.forEach(sec => {
-        if (sec.type === 'title')    totalH += lineH(18) + 4 * S;
-        else if (sec.type === 'subtitle') totalH += lineH(13);
-        else if (sec.type === 'divider')  totalH += 18 * S;
-        else if (sec.type === 'row')      totalH += lineH(13);
-        else if (sec.type === 'indent')   totalH += lineH(13);
-        else if (sec.type === 'footer')   totalH += lineH(13) + 4 * S;
+        if (sec.type === 'title')    totalH += lineH(27) + 6 * S;
+        else if (sec.type === 'subtitle') totalH += lineH(19);
+        else if (sec.type === 'divider')  totalH += 22 * S;
+        else if (sec.type === 'row')      totalH += lineH(19);
+        else if (sec.type === 'indent')   totalH += lineH(19);
+        else if (sec.type === 'footer')   totalH += lineH(19) + 6 * S;
         else if (sec.type === 'spacer')   totalH += (sec.h || 8) * S;
     });
     totalH += 36 * S; // bottom teeth + padding
@@ -4544,22 +4544,22 @@ function makeReceiptCanvas(sections) {
     sections.forEach(sec => {
         ctx.textBaseline = 'alphabetic';
         if (sec.type === 'title') {
-            ctx.font = `600 ${18 * S}px 'Noto Serif SC', serif`;
+            ctx.font = `600 ${27 * S}px 'Noto Serif SC', serif`;
             ctx.fillStyle = '#000000';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 18 * S); y += lineH(18) + 4 * S;
+            ctx.fillText(sec.text, W / 2, y + 27 * S); y += lineH(27) + 6 * S;
 
         } else if (sec.type === 'subtitle') {
-            ctx.font = `400 ${13 * S}px 'Courier New', monospace`;
+            ctx.font = `400 ${19 * S}px 'Courier New', monospace`;
             ctx.fillStyle = '#333333';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13);
+            ctx.fillText(sec.text, W / 2, y + 19 * S); y += lineH(19);
 
         } else if (sec.type === 'divider') {
-            dash(y + 8 * S); y += 18 * S;
+            dash(y + 10 * S); y += 22 * S;
 
         } else if (sec.type === 'row') {
-            const fs = sec.bold ? 14 : 13;
+            const fs = sec.bold ? 21 : 19;
             ctx.font = `${sec.bold ? '700' : '400'} ${fs * S}px 'Courier New', monospace`;
             ctx.fillStyle = sec.dim ? '#555555' : '#111111';
             // key left
@@ -4575,7 +4575,7 @@ function makeReceiptCanvas(sections) {
             if (dotsArea > 0) {
                 ctx.fillStyle = '#aaaaaa';
                 const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
-                ctx.font = `400 ${11 * S}px 'Courier New', monospace`;
+                ctx.font = `400 ${16 * S}px 'Courier New', monospace`;
                 ctx.textAlign = 'left';
                 // clip dots to available space
                 let dots = '';
@@ -4588,16 +4588,16 @@ function makeReceiptCanvas(sections) {
             y += lineH(fs);
 
         } else if (sec.type === 'indent') {
-            ctx.font = `400 ${13 * S}px 'Courier New', monospace`;
+            ctx.font = `400 ${19 * S}px 'Courier New', monospace`;
             ctx.fillStyle = '#222222';
             ctx.textAlign = 'left';
-            ctx.fillText(sec.text, PAD + 12 * S, y + 13 * S); y += lineH(13);
+            ctx.fillText(sec.text, PAD + 12 * S, y + 19 * S); y += lineH(19);
 
         } else if (sec.type === 'footer') {
-            ctx.font = `400 ${13 * S}px 'Noto Serif SC', serif`;
+            ctx.font = `400 ${19 * S}px 'Noto Serif SC', serif`;
             ctx.fillStyle = '#444444';
             ctx.textAlign = 'center';
-            ctx.fillText(sec.text, W / 2, y + 13 * S); y += lineH(13) + 4 * S;
+            ctx.fillText(sec.text, W / 2, y + 19 * S); y += lineH(19) + 6 * S;
 
         } else if (sec.type === 'spacer') {
             y += (sec.h || 8) * S;
