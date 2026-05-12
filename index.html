@@ -4735,7 +4735,7 @@ function makeReceiptCanvas(sections) {
     function dash(yy) {
         ctx.save();
         ctx.setLineDash([4 * S, 5 * S]);
-        ctx.strokeStyle = 'rgba(80,50,20,0.18)';
+        ctx.strokeStyle = 'rgba(40,20,5,0.35)';
         ctx.lineWidth = S;
         ctx.beginPath();
         ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy);
@@ -4752,7 +4752,7 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'subtitle') {
             ctx.font = `400 ${19 * S}px 'Courier New', monospace`;
-            ctx.fillStyle = '#7a5c3e';
+            ctx.fillStyle = '#4a3520';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 19 * S); y += lineH(19);
 
@@ -4770,7 +4770,7 @@ function makeReceiptCanvas(sections) {
         } else if (sec.type === 'row') {
             const fs = sec.bold ? 21 : 19;
             ctx.font = `${sec.bold ? '600' : '400'} ${fs * S}px 'Courier New', monospace`;
-            ctx.fillStyle = sec.dim ? '#a08060' : '#2a1608';
+            ctx.fillStyle = sec.dim ? '#6a4828' : '#2a1608';
             // key left
             ctx.textAlign = 'left';
             ctx.fillText(sec.key, PAD, y + fs * S);
@@ -4782,7 +4782,7 @@ function makeReceiptCanvas(sections) {
             const valW = ctx.measureText(sec.val).width;
             const dotsArea = W - PAD * 2 - keyW - valW - 8 * S;
             if (dotsArea > 0) {
-                ctx.fillStyle = 'rgba(80,50,20,0.25)';
+                ctx.fillStyle = 'rgba(40,20,5,0.38)';
                 const dotStr = '· · · · · · · · · · · · · · · · · · · · · · · · ·';
                 ctx.font = `400 ${16 * S}px 'Courier New', monospace`;
                 ctx.textAlign = 'left';
@@ -4798,13 +4798,13 @@ function makeReceiptCanvas(sections) {
 
         } else if (sec.type === 'indent') {
             ctx.font = `400 ${19 * S}px 'Courier New', monospace`;
-            ctx.fillStyle = '#5a3c22';
+            ctx.fillStyle = '#2a1608';
             ctx.textAlign = 'left';
             ctx.fillText(sec.text, PAD + 12 * S, y + 19 * S); y += lineH(19);
 
         } else if (sec.type === 'footer') {
             ctx.font = `400 ${19 * S}px 'Noto Serif SC', serif`;
-            ctx.fillStyle = '#9a7050';
+            ctx.fillStyle = '#6a4828';
             ctx.textAlign = 'center';
             ctx.fillText(sec.text, W / 2, y + 19 * S); y += lineH(19) + 6 * S;
 
@@ -4822,10 +4822,10 @@ function makeReceiptCanvas(sections) {
                 ctx.beginPath();
                 ctx.arc(startX + i * gap, y + dotR, dotR, 0, Math.PI * 2);
                 if (i < done) {
-                    ctx.fillStyle = 'rgba(196,149,106,0.85)';
+                    ctx.fillStyle = '#2a1608';
                     ctx.fill();
                 } else {
-                    ctx.fillStyle = 'rgba(196,149,106,0.22)';
+                    ctx.fillStyle = 'rgba(40,20,5,0.18)';
                     ctx.fill();
                 }
             }
@@ -4843,7 +4843,7 @@ function makeReceiptCanvas(sections) {
             ctx.fillRect(W - PAD - 2 * S, y + 2 * S, 2 * S, bh);
             for (let i = 0; i < total; i++) {
                 const bx = PAD + 2 * S + i * cellW;
-                ctx.fillStyle = i < filled ? 'rgba(196,149,106,0.82)' : 'rgba(196,149,106,0.14)';
+                ctx.fillStyle = i < filled ? '#2a1608' : 'rgba(40,20,5,0.1)';
                 ctx.fillRect(bx + S, y + 3 * S, cellW - 2 * S, bh - 2 * S);
             }
             y += bh + 8 * S;
@@ -4855,7 +4855,7 @@ function makeReceiptCanvas(sections) {
             ctx.translate(cx, cy);
             ctx.rotate(-11 * Math.PI / 180);
             const rx = 52 * S, ry = 25 * S;
-            ctx.strokeStyle = 'rgba(155,40,40,0.52)';
+            ctx.strokeStyle = 'rgba(120,20,20,0.82)';
             ctx.lineWidth = 2 * S;
             ctx.setLineDash([3 * S, 2 * S]);
             ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
@@ -4863,7 +4863,7 @@ function makeReceiptCanvas(sections) {
             ctx.lineWidth = S;
             ctx.beginPath(); ctx.ellipse(0, 0, rx - 5 * S, ry - 5 * S, 0, 0, Math.PI * 2); ctx.stroke();
             ctx.font = `700 ${17 * S}px 'Courier New', monospace`;
-            ctx.fillStyle = 'rgba(155,40,40,0.52)';
+            ctx.fillStyle = 'rgba(120,20,20,0.82)';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(sec.text || 'PASSED', 0, 0);
             ctx.restore();
@@ -4888,7 +4888,7 @@ function makeReceiptCanvas(sections) {
                 }
             }
             ctx.font = `400 ${9 * S}px 'Courier New', monospace`;
-            ctx.fillStyle = '#5a3c22';
+            ctx.fillStyle = '#2a1608';
             ctx.textAlign = 'center';
             ctx.fillText(sec.code || '', W / 2, y + bh + 8 * S);
             y += bh + 14 * S;
